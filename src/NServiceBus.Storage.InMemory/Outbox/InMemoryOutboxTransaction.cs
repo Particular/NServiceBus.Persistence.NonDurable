@@ -10,10 +10,10 @@
     {
         public InMemoryOutboxTransaction()
         {
-            Transaction = new InMemoryTransaction();
+            Transaction = new InMemoryTransaction2();
         }
 
-        public InMemoryTransaction Transaction { get; private set; }
+        public InMemoryTransaction2 Transaction { get; private set; }
 
         public void Dispose()
         {

@@ -22,7 +22,7 @@ namespace NServiceBus.InMemory.Outbox
         public static OutboxSettings TimeToKeepDeduplicationData(this OutboxSettings settings, TimeSpan time)
         {
             Guard.AgainstNegativeAndZero(nameof(time), time);
-            settings.GetSettings().Set(InMemoryOutboxPersistence.TimeToKeepDeduplicationEntries, time);
+            settings.GetSettings().Set(InMemoryOutboxPersistence2.TimeToKeepDeduplicationEntries, time);
             return settings;
         }
     }

@@ -22,7 +22,7 @@ namespace NServiceBus
 
         public Task Complete(IContainSagaData sagaData, SynchronizedStorageSession session, ContextBag context)
         {
-            ((InMemorySynchronizedStorageSession)session).Enlist(() =>
+            ((InMemorySynchronizedStorageSession2)session).Enlist(() =>
            {
                var entry = GetEntry(context, sagaData.Id);
 
@@ -72,7 +72,7 @@ namespace NServiceBus
 
         public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context)
         {
-            ((InMemorySynchronizedStorageSession)session).Enlist(() =>
+            ((InMemorySynchronizedStorageSession2)session).Enlist(() =>
            {
                var correlationId = NoCorrelationId;
                if (correlationProperty != SagaCorrelationProperty.None)
@@ -96,7 +96,7 @@ namespace NServiceBus
 
         public Task Update(IContainSagaData sagaData, SynchronizedStorageSession session, ContextBag context)
         {
-            ((InMemorySynchronizedStorageSession)session).Enlist(() =>
+            ((InMemorySynchronizedStorageSession2)session).Enlist(() =>
            {
                var entry = GetEntry(context, sagaData.Id);
 

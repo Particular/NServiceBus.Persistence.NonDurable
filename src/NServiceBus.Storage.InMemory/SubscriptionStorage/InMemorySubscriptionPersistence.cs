@@ -1,13 +1,17 @@
 ﻿namespace NServiceBus.Features
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     /// <summary>
     /// Used to configure in memory subscription persistence.
     /// </summary>
-    public class InMemorySubscriptionPersistence : Feature
+    public class InMemorySubscriptionPersistence2 : Feature
     {
-        internal InMemorySubscriptionPersistence()
+        internal InMemorySubscriptionPersistence2()
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             DependsOn<MessageDrivenSubscriptions>();
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         /// <summary>
@@ -15,8 +19,7 @@
         /// </summary>
         protected override void Setup(FeatureConfigurationContext context)
         {
-            
-            context.Services.Add(new InMemorySubscriptionStorage2());
+            context.Services.AddSingleton(new InMemorySubscriptionStorage2());
         }
     }
 }

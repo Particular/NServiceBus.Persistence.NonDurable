@@ -14,7 +14,7 @@ namespace NServiceBus
         {
             if (transaction is InMemoryOutboxTransaction inMemOutboxTransaction)
             {
-                CompletableSynchronizedStorageSession session = new InMemorySynchronizedStorageSession(inMemOutboxTransaction.Transaction);
+                CompletableSynchronizedStorageSession session = new InMemorySynchronizedStorageSession2(inMemOutboxTransaction.Transaction);
                 return Task.FromResult(session);
             }
             return EmptyTask;
@@ -25,7 +25,7 @@ namespace NServiceBus
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
                 var transaction = new InMemoryTransaction2();
-                CompletableSynchronizedStorageSession session = new InMemorySynchronizedStorageSession(transaction);
+                CompletableSynchronizedStorageSession session = new InMemorySynchronizedStorageSession2(transaction);
                 ambientTransaction.EnlistVolatile(new EnlistmentNotification2(transaction), EnlistmentOptions.None);
                 return Task.FromResult(session);
             }

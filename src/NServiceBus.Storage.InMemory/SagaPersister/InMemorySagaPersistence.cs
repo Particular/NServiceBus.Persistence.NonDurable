@@ -1,5 +1,7 @@
 ﻿namespace NServiceBus.Features
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     /// <summary>
     /// Used to configure in memory saga persistence.
     /// </summary>
@@ -13,9 +15,9 @@
         /// <summary>
         /// See <see cref="Feature.Setup" />.
         /// </summary>
-        protected internal override void Setup(FeatureConfigurationContext context)
+        protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Container.ConfigureComponent<InMemorySagaPersister>(DependencyLifecycle.SingleInstance);
+            context.Services.AddSingleton<InMemorySagaPersister>();
         }
     }
 }
