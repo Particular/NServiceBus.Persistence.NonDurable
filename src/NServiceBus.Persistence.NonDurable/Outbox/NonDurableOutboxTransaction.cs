@@ -6,14 +6,14 @@
     using Outbox;
 
     [SkipWeaving]
-    class InMemoryOutboxTransaction : OutboxTransaction
+    class NonDurableOutboxTransaction : OutboxTransaction
     {
-        public InMemoryOutboxTransaction()
+        public NonDurableOutboxTransaction()
         {
-            Transaction = new InMemoryTransaction2();
+            Transaction = new NonDurableTransaction();
         }
 
-        public InMemoryTransaction2 Transaction { get; private set; }
+        public NonDurableTransaction Transaction { get; private set; }
 
         public void Dispose()
         {

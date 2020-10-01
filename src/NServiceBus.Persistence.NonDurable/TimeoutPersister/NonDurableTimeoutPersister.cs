@@ -8,9 +8,9 @@ namespace NServiceBus
     using Extensibility;
     using Timeout.Core;
 
-    class InMemoryTimeoutPersister : IPersistTimeouts, IQueryTimeouts, IDisposable
+    class NonDurableTimeoutPersister : IPersistTimeouts, IQueryTimeouts, IDisposable
     {
-        public InMemoryTimeoutPersister(Func<DateTime> currentTimeProvider)
+        public NonDurableTimeoutPersister(Func<DateTime> currentTimeProvider)
         {
             this.currentTimeProvider = currentTimeProvider;
         }

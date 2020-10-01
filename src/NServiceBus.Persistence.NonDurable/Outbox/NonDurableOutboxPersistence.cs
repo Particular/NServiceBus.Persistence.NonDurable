@@ -7,14 +7,13 @@
     using NServiceBus.Outbox;
 
     /// <summary>
-    /// Used to configure in memory outbox persistence.
+    /// Used to configure non durable outbox persistence.
     /// </summary>
-    public class InMemoryOutboxPersistence2 : Feature
+    public class NonDurableOutboxPersistence : Feature
     {
-        internal InMemoryOutboxPersistence2()
+        internal NonDurableOutboxPersistence()
         {
             DependsOn<Outbox>();
-
         }
 
         /// <summary>
@@ -22,7 +21,7 @@
         /// </summary>
         protected override void Setup(FeatureConfigurationContext context)
         {
-            var outboxStorage = new InMemoryOutboxStorage();
+            var outboxStorage = new NonDurableOutboxStorage();
             context.Services.AddSingleton(typeof(IOutboxStorage), outboxStorage);
 
             var timeSpan = context.Settings.Get<TimeSpan>(TimeToKeepDeduplicationEntries);
@@ -34,10 +33,10 @@
 
         class OutboxCleaner : FeatureStartupTask
         {
-            public OutboxCleaner(InMemoryOutboxStorage storage, TimeSpan timeToKeepDeduplicationData)
+            public OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplicationData)
             {
                 this.timeToKeepDeduplicationData = timeToKeepDeduplicationData;
-                inMemoryOutboxStorage = storage;
+                nonDurableOutboxStorage = storage;
             }
 
             protected override Task OnStart(IMessageSession session)
@@ -60,10 +59,10 @@
 
             void PerformCleanup(object state)
             {
-                inMemoryOutboxStorage.RemoveEntriesOlderThan(DateTime.UtcNow - timeToKeepDeduplicationData);
+                nonDurableOutboxStorage.RemoveEntriesOlderThan(DateTime.UtcNow - timeToKeepDeduplicationData);
             }
 
-            readonly InMemoryOutboxStorage inMemoryOutboxStorage;
+            readonly NonDurableOutboxStorage nonDurableOutboxStorage;
             readonly TimeSpan timeToKeepDeduplicationData;
 
 // ReSharper disable once NotAccessedField.Local

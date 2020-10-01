@@ -6,7 +6,7 @@
     using Extensibility;
     using Outbox;
 
-    class InMemoryOutboxStorage : IOutboxStorage
+    class NonDurableOutboxStorage : IOutboxStorage
     {
         public Task<OutboxMessage> Get(string messageId, ContextBag context)
         {
@@ -20,12 +20,12 @@
 
         public Task<OutboxTransaction> BeginTransaction(ContextBag context)
         {
-            return Task.FromResult<OutboxTransaction>(new InMemoryOutboxTransaction());
+            return Task.FromResult<OutboxTransaction>(new NonDurableOutboxTransaction());
         }
 
         public Task Store(OutboxMessage message, OutboxTransaction transaction, ContextBag context)
         {
-            var tx = (InMemoryOutboxTransaction) transaction;
+            var tx = (NonDurableOutboxTransaction) transaction;
             tx.Enlist(() =>
             {
                 if (!storage.TryAdd(message.MessageId, new StoredMessage(message.MessageId, message.TransportOperations)))

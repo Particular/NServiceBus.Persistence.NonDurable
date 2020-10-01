@@ -8,7 +8,7 @@ namespace NServiceBus
     using Unicast.Subscriptions;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
-    class InMemorySubscriptionStorage2 : ISubscriptionStorage
+    class NonDurableSubscriptionStorage : ISubscriptionStorage
     {
         public Task Subscribe(Subscriber subscriber, MessageType messageType, ContextBag context)
         {

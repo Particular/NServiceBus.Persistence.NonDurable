@@ -3,11 +3,11 @@
     using Microsoft.Extensions.DependencyInjection;
 
     /// <summary>
-    /// Used to configure in memory saga persistence.
+    /// Used to configure non durable saga persistence.
     /// </summary>
-    public class InMemorySagaPersistence2 : Feature
+    public class NonDurableSagaPersistence : Feature
     {
-        internal InMemorySagaPersistence2()
+        internal NonDurableSagaPersistence()
         {
             DependsOn<Sagas>();
         }
@@ -17,7 +17,7 @@
         /// </summary>
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton<InMemorySagaPersister>();
+            context.Services.AddSingleton<NonDurableSagaPersister>();
         }
     }
 }

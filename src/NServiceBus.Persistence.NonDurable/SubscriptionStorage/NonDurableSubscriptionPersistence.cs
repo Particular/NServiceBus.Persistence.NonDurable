@@ -3,11 +3,11 @@
     using Microsoft.Extensions.DependencyInjection;
 
     /// <summary>
-    /// Used to configure in memory subscription persistence.
+    /// Used to configure non durable subscription persistence.
     /// </summary>
-    public class InMemorySubscriptionPersistence2 : Feature
+    public class NonDurableSubscriptionPersistence : Feature
     {
-        internal InMemorySubscriptionPersistence2()
+        internal NonDurableSubscriptionPersistence()
         {
 #pragma warning disable CS0618 // Type or member is obsolete
             DependsOn<MessageDrivenSubscriptions>();
@@ -19,7 +19,7 @@
         /// </summary>
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton(new InMemorySubscriptionStorage2());
+            context.Services.AddSingleton(new NonDurableSubscriptionStorage());
         }
     }
 }

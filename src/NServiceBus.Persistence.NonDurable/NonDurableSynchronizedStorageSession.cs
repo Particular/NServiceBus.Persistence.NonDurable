@@ -6,20 +6,20 @@ namespace NServiceBus
     using Persistence;
 
     [SkipWeaving]
-    class InMemorySynchronizedStorageSession2 : CompletableSynchronizedStorageSession
+    class NonDurableSynchronizedStorageSession : CompletableSynchronizedStorageSession
     {
-        public InMemorySynchronizedStorageSession2(InMemoryTransaction2 transaction)
+        public NonDurableSynchronizedStorageSession(NonDurableTransaction transaction)
         {
             Transaction = transaction;
         }
 
-        public InMemorySynchronizedStorageSession2()
-            : this(new InMemoryTransaction2())
+        public NonDurableSynchronizedStorageSession()
+            : this(new NonDurableTransaction())
         {
             ownsTransaction = true;
         }
 
-        public InMemoryTransaction2 Transaction { get; private set; }
+        public NonDurableTransaction Transaction { get; private set; }
 
         public void Dispose()
         {

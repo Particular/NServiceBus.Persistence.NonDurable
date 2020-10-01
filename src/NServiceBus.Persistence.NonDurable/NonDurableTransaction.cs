@@ -3,7 +3,7 @@ namespace NServiceBus
     using System;
     using System.Collections.Generic;
 
-    class InMemoryTransaction2
+    class NonDurableTransaction
     {
         public void Enlist(Action action)
         {

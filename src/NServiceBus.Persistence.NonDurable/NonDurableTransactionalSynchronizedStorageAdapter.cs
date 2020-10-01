@@ -8,13 +8,13 @@ namespace NServiceBus
     using Persistence;
     using Transport;
 
-    class InMemoryTransactionalSynchronizedStorageAdapter2 : ISynchronizedStorageAdapter
+    class NonDurableTransactionalSynchronizedStorageAdapter : ISynchronizedStorageAdapter
     {
         public Task<CompletableSynchronizedStorageSession> TryAdapt(OutboxTransaction transaction, ContextBag context)
         {
-            if (transaction is InMemoryOutboxTransaction inMemOutboxTransaction)
+            if (transaction is NonDurableOutboxTransaction inMemOutboxTransaction)
             {
-                CompletableSynchronizedStorageSession session = new InMemorySynchronizedStorageSession2(inMemOutboxTransaction.Transaction);
+                CompletableSynchronizedStorageSession session = new NonDurableSynchronizedStorageSession(inMemOutboxTransaction.Transaction);
                 return Task.FromResult(session);
             }
             return EmptyTask;
@@ -24,8 +24,8 @@ namespace NServiceBus
         {
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
-                var transaction = new InMemoryTransaction2();
-                CompletableSynchronizedStorageSession session = new InMemorySynchronizedStorageSession2(transaction);
+                var transaction = new NonDurableTransaction();
+                CompletableSynchronizedStorageSession session = new NonDurableSynchronizedStorageSession(transaction);
                 ambientTransaction.EnlistVolatile(new EnlistmentNotification2(transaction), EnlistmentOptions.None);
                 return Task.FromResult(session);
             }
@@ -36,7 +36,7 @@ namespace NServiceBus
 
         class EnlistmentNotification2 : IEnlistmentNotification
         {
-            public EnlistmentNotification2(InMemoryTransaction2 transaction)
+            public EnlistmentNotification2(NonDurableTransaction transaction)
             {
                 this.transaction = transaction;
             }
@@ -70,7 +70,7 @@ namespace NServiceBus
                 enlistment.Done();
             }
 
-            InMemoryTransaction2 transaction;
+            NonDurableTransaction transaction;
         }
     }
 }
