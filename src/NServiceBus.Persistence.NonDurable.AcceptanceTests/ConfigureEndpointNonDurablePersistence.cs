@@ -7,7 +7,7 @@ namespace NServiceBus.AcceptanceTests
     {
         public Task Configure(string endpointName, EndpointConfiguration configuration, RunSettings settings, PublisherMetadata publisherMetadata)
         {
-            configuration.UsePersistence<InMemoryPersistence>();
+            configuration.UsePersistence<NonDurablePersistence>();
             return Task.FromResult(0);
         }
 

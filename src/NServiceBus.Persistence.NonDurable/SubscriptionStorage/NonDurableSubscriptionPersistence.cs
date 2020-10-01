@@ -1,4 +1,6 @@
-﻿namespace NServiceBus.Features
+﻿using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
+
+namespace NServiceBus.Features
 {
     using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +15,7 @@
         
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton(new NonDurableSubscriptionStorage());
+            context.Services.AddSingleton<ISubscriptionStorage, NonDurableSubscriptionStorage>();
         }
     }
 }

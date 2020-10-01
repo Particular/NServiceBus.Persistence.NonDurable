@@ -1,4 +1,6 @@
-﻿namespace NServiceBus
+﻿using NServiceBus.Persistence;
+
+namespace NServiceBus
 {
     using Features;
     using Microsoft.Extensions.DependencyInjection;
@@ -10,8 +12,8 @@
         /// </summary>
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton<NonDurableSynchronizedStorage>();
-            context.Services.AddSingleton<NonDurableTransactionalSynchronizedStorageAdapter>();
+            context.Services.AddSingleton<ISynchronizedStorage, NonDurableSynchronizedStorage>();
+            context.Services.AddSingleton<ISynchronizedStorageAdapter, NonDurableTransactionalSynchronizedStorageAdapter>();
         }
     }
 }

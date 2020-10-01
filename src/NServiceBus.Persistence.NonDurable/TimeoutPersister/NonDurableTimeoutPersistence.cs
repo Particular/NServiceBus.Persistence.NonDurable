@@ -1,4 +1,6 @@
-﻿namespace NServiceBus.Features
+﻿using NServiceBus.Timeout.Core;
+
+namespace NServiceBus.Features
 {
     using System;
     using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +13,10 @@
         }
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton(_ => new NonDurableTimeoutPersister(() => DateTime.UtcNow));
+            var nonDurableTimeoutPersister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            
+            context.Services.AddSingleton<IQueryTimeouts>(nonDurableTimeoutPersister);
+            context.Services.AddSingleton<IPersistTimeouts>(nonDurableTimeoutPersister);
         }
     }
 }

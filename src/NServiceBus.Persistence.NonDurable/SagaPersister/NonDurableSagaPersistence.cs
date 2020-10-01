@@ -1,4 +1,6 @@
-﻿namespace NServiceBus.Features
+﻿using NServiceBus.Sagas;
+
+namespace NServiceBus.Features
 {
     using Microsoft.Extensions.DependencyInjection;
 
@@ -11,7 +13,7 @@
 
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton<NonDurableSagaPersister>();
+            context.Services.AddSingleton<ISagaPersister, NonDurableSagaPersister>();
         }
     }
 }
