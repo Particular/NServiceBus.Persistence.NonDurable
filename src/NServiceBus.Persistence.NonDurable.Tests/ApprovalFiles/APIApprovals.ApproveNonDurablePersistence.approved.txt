@@ -1,0 +1,6 @@
+﻿[assembly: System.Runtime.CompilerServices.InternalsVisibleToAttribute("NServiceBus.Persistence.NonDurable.PersistenceTests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleToAttribute("NServiceBus.Persistence.NonDurable.Tests")]
+namespace NServiceBus
+{
+    public class NonDurablePersistence : NServiceBus.Persistence.PersistenceDefinition { }
+}
