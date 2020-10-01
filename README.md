@@ -1,1 +1,1 @@
-# NServiceBus.Storage.InMemory
+# NServiceBus.Persistence.NonDurable
