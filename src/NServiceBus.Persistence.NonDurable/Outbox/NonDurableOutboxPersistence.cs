@@ -6,19 +6,13 @@
     using Microsoft.Extensions.DependencyInjection;
     using NServiceBus.Outbox;
 
-    /// <summary>
-    /// Used to configure non durable outbox persistence.
-    /// </summary>
-    public class NonDurableOutboxPersistence : Feature
+    class NonDurableOutboxPersistence : Feature
     {
         internal NonDurableOutboxPersistence()
         {
             DependsOn<Outbox>();
         }
 
-        /// <summary>
-        /// See <see cref="Feature.Setup" />.
-        /// </summary>
         protected override void Setup(FeatureConfigurationContext context)
         {
             var outboxStorage = new NonDurableOutboxStorage();

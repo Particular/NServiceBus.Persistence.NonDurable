@@ -8,7 +8,7 @@ namespace NServiceBus.NonDurable.Outbox
     /// <summary>
     /// Contains NonDurableOutbox-related settings extensions.
     /// </summary>
-    public static class NonDurableOutboxSettingsExtensions
+    static class NonDurableOutboxSettingsExtensions
     {
         /// <summary>
         /// Specifies how long the outbox should keep message data in storage to be able to deduplicate.
