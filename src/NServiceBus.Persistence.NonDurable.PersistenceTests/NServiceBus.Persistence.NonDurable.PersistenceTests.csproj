@@ -21,7 +21,7 @@
     <PackageReference Include="NUnit" Version="3.12.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.16.1" />
     <PackageReference Include="Particular.CodeRules" Version="0.3.0" />
-    <PackageReference Include="NServiceBus.PersistenceTests.Sources" Version="7.4.0" />
+    <PackageReference Include="NServiceBus.PersistenceTests.Sources" Version="8.0.0-alpha.561" />
   </ItemGroup>
 
   <ItemGroup>
