@@ -18,7 +18,9 @@
 
             Supports<StorageType.Timeouts>(s => s.EnableFeatureByDefault<NonDurableTimeoutPersistence>());
             Supports<StorageType.Subscriptions>(s => s.EnableFeatureByDefault<NonDurableSubscriptionPersistence>());
-            Supports<StorageType.Outbox>(s => { s.EnableFeatureByDefault<NonDurableOutboxPersistence>();
+            Supports<StorageType.Outbox>(s =>
+            {
+                s.EnableFeatureByDefault<NonDurableOutboxPersistence>();
                 s.EnableFeatureByDefault<NonDurableTransactionalStorageFeature>();
             });
         }
