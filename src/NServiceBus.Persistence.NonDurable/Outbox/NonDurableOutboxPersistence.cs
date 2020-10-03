@@ -8,7 +8,7 @@
 
     class NonDurableOutboxPersistence : Feature
     {
-        internal NonDurableOutboxPersistence()
+        public NonDurableOutboxPersistence()
         {
             DependsOn<Outbox>();
         }
@@ -23,7 +23,7 @@
             context.RegisterStartupTask(new OutboxCleaner(outboxStorage, timeSpan));
         }
 
-        internal const string TimeToKeepDeduplicationEntries = "Outbox.TimeToKeepDeduplicationEntries";
+        public const string TimeToKeepDeduplicationEntries = "Outbox.TimeToKeepDeduplicationEntries";
 
         class OutboxCleaner : FeatureStartupTask
         {

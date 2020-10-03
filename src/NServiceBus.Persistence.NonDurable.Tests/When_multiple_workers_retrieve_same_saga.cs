@@ -4,7 +4,7 @@
     using System.Threading.Tasks;
     using Extensibility;
     using NUnit.Framework;
-    
+
     [TestFixture]
     internal class When_multiple_workers_retrieve_same_saga
     {

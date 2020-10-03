@@ -1,12 +1,11 @@
-﻿using NServiceBus.Sagas;
-
-namespace NServiceBus.Features
+﻿namespace NServiceBus.Features
 {
+    using NServiceBus.Sagas;
     using Microsoft.Extensions.DependencyInjection;
 
     class NonDurableSagaPersistence : Feature
     {
-        internal NonDurableSagaPersistence()
+        public NonDurableSagaPersistence()
         {
             DependsOn<Sagas>();
         }

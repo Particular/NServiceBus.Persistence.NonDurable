@@ -1,8 +1,8 @@
-﻿using System.Threading.Tasks;
-using NServiceBus.AcceptanceTesting.Support;
-
-namespace NServiceBus.AcceptanceTests
+﻿namespace NServiceBus.AcceptanceTests
 {
+    using System.Threading.Tasks;
+    using NServiceBus.AcceptanceTesting.Support;
+
     public class ConfigureEndpointNonDurablePersistence : IConfigureEndpointTestExecution
     {
         public Task Configure(string endpointName, EndpointConfiguration configuration, RunSettings settings, PublisherMetadata publisherMetadata)

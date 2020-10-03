@@ -70,7 +70,7 @@ namespace NServiceBus
                 enlistment.Done();
             }
 
-            NonDurableTransaction transaction;
+            readonly NonDurableTransaction transaction;
         }
     }
 }
