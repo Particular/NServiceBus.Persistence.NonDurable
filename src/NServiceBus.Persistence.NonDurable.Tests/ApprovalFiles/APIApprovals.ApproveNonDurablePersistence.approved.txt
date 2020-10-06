@@ -2,5 +2,9 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleToAttribute("NServiceBus.Persistence.NonDurable.Tests")]
 namespace NServiceBus
 {
+    public class static NonDurableOutboxSettingsExtensions
+    {
+        public static NServiceBus.Outbox.OutboxSettings TimeToKeepDeduplicationData(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
+    }
     public class NonDurablePersistence : NServiceBus.Persistence.PersistenceDefinition { }
 }

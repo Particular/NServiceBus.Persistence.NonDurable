@@ -1,4 +1,4 @@
-namespace NServiceBus.NonDurable.Outbox
+namespace NServiceBus
 {
     using System;
     using Configuration.AdvancedExtensibility;
