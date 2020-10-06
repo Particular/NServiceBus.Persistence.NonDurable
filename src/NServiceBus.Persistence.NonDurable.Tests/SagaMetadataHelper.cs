@@ -1,7 +1,7 @@
-using NServiceBus.Sagas;
-
 namespace NServiceBus.Persistence.NonDurable.Tests
 {
+    using NServiceBus.Sagas;
+
     class SagaMetadataHelper
     {
         public static SagaCorrelationProperty GetMetadata<T>(IContainSagaData entity)

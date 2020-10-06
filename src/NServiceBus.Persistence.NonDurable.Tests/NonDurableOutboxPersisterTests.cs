@@ -6,7 +6,7 @@
     using Extensibility;
     using Outbox;
     using NUnit.Framework;
-    
+
     [TestFixture]
     class NonDurableOutboxPersisterTests
     {
