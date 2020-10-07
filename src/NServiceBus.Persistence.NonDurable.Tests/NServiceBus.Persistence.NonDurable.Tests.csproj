@@ -5,8 +5,8 @@
         <NoWarn>$(NoWarn);CA2007</NoWarn>
         <IsPackable>false</IsPackable>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-        <!--    <SignAssembly>true</SignAssembly>-->
-        <!--    <AssemblyOriginatorKeyFile>..\Test.snk</AssemblyOriginatorKeyFile>-->
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>..\Test.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
