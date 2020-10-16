@@ -2,10 +2,8 @@ namespace NServiceBus
 {
     using System;
     using System.Threading.Tasks;
-    using Janitor;
     using Persistence;
 
-    [SkipWeaving]
     class NonDurableSynchronizedStorageSession : CompletableSynchronizedStorageSession
     {
         public NonDurableSynchronizedStorageSession(NonDurableTransaction transaction)

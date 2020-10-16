@@ -18,24 +18,31 @@
             var outboxStorage = new NonDurableOutboxStorage();
             context.Services.AddSingleton(typeof(IOutboxStorage), outboxStorage);
 
-            var timeSpan = context.Settings.Get<TimeSpan>(TimeToKeepDeduplicationEntries);
+            var deduplicationPeriod = context.Settings.Get<TimeSpan>(TimeToKeepDeduplicationEntries);
+            TimeSpan cleanupInterval;
+            if (!context.Settings.TryGet<TimeSpan>(IntervalToCheckForDuplicateEntries, out cleanupInterval))
+            {
+                cleanupInterval= TimeSpan.FromMinutes(1);
+            }
 
-            context.RegisterStartupTask(new OutboxCleaner(outboxStorage, timeSpan));
+            context.RegisterStartupTask(new OutboxCleaner(outboxStorage, deduplicationPeriod, cleanupInterval));
         }
 
         public const string TimeToKeepDeduplicationEntries = "Outbox.TimeToKeepDeduplicationEntries";
+        public const string IntervalToCheckForDuplicateEntries = "Outbox.NonDurableTimeToCheckForDuplicateEntries";
 
         class OutboxCleaner : FeatureStartupTask
         {
-            public OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplicationData)
+            public OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplicationData, TimeSpan intervalToCheckForDuplicates)
             {
                 this.timeToKeepDeduplicationData = timeToKeepDeduplicationData;
+                this.intervalToCheckForDuplicates = intervalToCheckForDuplicates;
                 nonDurableOutboxStorage = storage;
             }
 
             protected override Task OnStart(IMessageSession session)
             {
-                cleanupTimer = new Timer(PerformCleanup, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+                cleanupTimer = new Timer(PerformCleanup, null, intervalToCheckForDuplicates, intervalToCheckForDuplicates);
                 return Task.CompletedTask;
             }
 
@@ -58,6 +65,7 @@
 
             readonly NonDurableOutboxStorage nonDurableOutboxStorage;
             readonly TimeSpan timeToKeepDeduplicationData;
+            readonly TimeSpan intervalToCheckForDuplicates;
 
             Timer cleanupTimer;
         }

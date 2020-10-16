@@ -2,10 +2,8 @@
 {
     using System;
     using System.Threading.Tasks;
-    using Janitor;
     using Outbox;
 
-    [SkipWeaving]
     class NonDurableOutboxTransaction : OutboxTransaction
     {
         public NonDurableOutboxTransaction()
