@@ -1,4 +1,6 @@
-﻿namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
+﻿using NServiceBus.Configuration.AdvancedExtensibility;
+
+namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
 {
     using System;
     using System.Threading.Tasks;
@@ -92,6 +94,7 @@
                     // limit to one to avoid race conditions on dispatch and this allows us to reliably check whether deduplication happens properly
                     b.LimitMessageProcessingConcurrencyTo(1);
                     b.EnableOutbox().TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3));
+                    b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromSeconds(1));
                     b.ConfigureTransport().Routing()
                         .RouteToEndpoint(typeof(SendOrderAcknowledgement), typeof(DownstreamEndpoint));
                 });
