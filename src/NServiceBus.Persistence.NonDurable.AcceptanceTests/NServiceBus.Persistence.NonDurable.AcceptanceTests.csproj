@@ -4,8 +4,6 @@
     <TargetFrameworks>net472;netcoreapp3.1</TargetFrameworks>
     <NoWarn>$(NoWarn);CA2007</NoWarn>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\Test.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
