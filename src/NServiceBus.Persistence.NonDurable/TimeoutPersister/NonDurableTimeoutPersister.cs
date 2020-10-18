@@ -96,10 +96,10 @@ namespace NServiceBus
             return Task.CompletedTask;
         }
 
-        public Task<TimeoutsChunk> GetNextChunk(DateTime startSlice)
+        public Task<TimeoutsChunk> GetNextChunk(DateTimeOffset startSlice)
         {
             var now = currentTimeProvider();
-            var nextTimeToRunQuery = DateTime.MaxValue;
+            var nextTimeToRunQuery = DateTimeOffset.MaxValue;
             var dueTimeouts = new List<TimeoutsChunk.Timeout>();
 
             try
