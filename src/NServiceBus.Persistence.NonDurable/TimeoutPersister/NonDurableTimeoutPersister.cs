@@ -10,7 +10,7 @@ namespace NServiceBus
 
     class NonDurableTimeoutPersister : IPersistTimeouts, IQueryTimeouts, IDisposable
     {
-        public NonDurableTimeoutPersister(Func<DateTime> currentTimeProvider)
+        public NonDurableTimeoutPersister(Func<DateTimeOffset> currentTimeProvider)
         {
             this.currentTimeProvider = currentTimeProvider;
         }
@@ -123,7 +123,7 @@ namespace NServiceBus
                 readerWriterLock.ExitReadLock();
             }
 
-            if (nextTimeToRunQuery == DateTime.MaxValue)
+            if (nextTimeToRunQuery == DateTimeOffset.MaxValue)
             {
                 nextTimeToRunQuery = now.Add(EmptyResultsNextTimeToRunQuerySpan);
             }
@@ -131,7 +131,7 @@ namespace NServiceBus
             return Task.FromResult(new TimeoutsChunk(dueTimeouts.ToArray(), nextTimeToRunQuery));
         }
 
-        Func<DateTime> currentTimeProvider;
+        Func<DateTimeOffset> currentTimeProvider;
         ReaderWriterLockSlim readerWriterLock = new ReaderWriterLockSlim();
         List<TimeoutData> storage = new List<TimeoutData>();
         public static TimeSpan EmptyResultsNextTimeToRunQuerySpan = TimeSpan.FromMinutes(1);

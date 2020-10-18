@@ -13,8 +13,8 @@
         [Test]
         public async Task When_empty_NextTimeToRunQuery_is_1_minute()
         {
-            var now = DateTime.UtcNow;
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var now = DateTimeOffset.UtcNow;
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             var result = await persister.GetNextChunk(now);
             Assert.That(result.NextTimeToQuery, Is.EqualTo(now.AddMinutes(1)).Within(100).Milliseconds);
         }
@@ -22,13 +22,13 @@
         [Test]
         public async Task When_multiple_NextTimeToRunQuery_is_min_date()
         {
-            var now = DateTime.UtcNow;
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var now = DateTimeOffset.UtcNow;
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(2)
+                              Time = DateTimeOffset.UtcNow.AddDays(2)
                           }, new ContextBag());
-            var expectedDate = DateTime.UtcNow.AddDays(1);
+            var expectedDate = DateTimeOffset.UtcNow.AddDays(1);
             await persister.Add(new TimeoutData
                           {
                               Time = expectedDate
@@ -42,21 +42,21 @@
         [Test]
         public async Task When_multiple_future_are_returned()
         {
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(-2)
+                              Time = DateTimeOffset.UtcNow.AddDays(-2)
                           }, new ContextBag());
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(-4)
+                              Time = DateTimeOffset.UtcNow.AddDays(-4)
                           }, new ContextBag());
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(-1)
+                              Time = DateTimeOffset.UtcNow.AddDays(-1)
                           }, new ContextBag());
 
-            var result = await persister.GetNextChunk(DateTime.UtcNow.AddDays(-3));
+            var result = await persister.GetNextChunk(DateTimeOffset.UtcNow.AddDays(-3));
 
             Assert.AreEqual(2, result.DueTimeouts.Count());
         }
@@ -64,7 +64,7 @@
         [Test]
         public async Task TryRemove_when_existing_is_removed_should_return_true()
         {
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             var inputTimeout = new TimeoutData();
             await persister.Add(inputTimeout, new ContextBag());
 
@@ -76,7 +76,7 @@
         [Test]
         public async Task TryRemove_when_non_existing_is_removed_should_return_false()
         {
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             var inputTimeout = new TimeoutData();
             await persister.Add(inputTimeout, new ContextBag());
 
@@ -88,7 +88,7 @@
         [Test]
         public async Task Peek_when_timeout_exists_should_return_timeout()
         {
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             var inputTimeout = new TimeoutData();
             await persister.Add(inputTimeout, new ContextBag());
 
@@ -100,7 +100,7 @@
         [Test]
         public async Task Peek_when_timeout_does_not_exist_should_return_null()
         {
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             var inputTimeout = new TimeoutData();
             await persister.Add(inputTimeout, new ContextBag());
 
@@ -112,7 +112,7 @@
         [Test]
         public async Task When_existing_is_removed_by_saga_id()
         {
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             var newGuid = Guid.NewGuid();
             var inputTimeout = new TimeoutData
                                {
@@ -129,19 +129,19 @@
         [Test]
         public async Task When_all_in_past_NextTimeToRunQuery_is_1_minute()
         {
-            var now = DateTime.UtcNow;
-            var persister = new NonDurableTimeoutPersister(() => DateTime.UtcNow);
+            var now = DateTimeOffset.UtcNow;
+            var persister = new NonDurableTimeoutPersister(() => DateTimeOffset.UtcNow);
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(-1)
+                              Time = DateTimeOffset.UtcNow.AddDays(-1)
                           }, new ContextBag());
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(-3)
+                              Time = DateTimeOffset.UtcNow.AddDays(-3)
                           }, new ContextBag());
             await persister.Add(new TimeoutData
                           {
-                              Time = DateTime.UtcNow.AddDays(-2)
+                              Time = DateTimeOffset.UtcNow.AddDays(-2)
                           }, new ContextBag());
 
             var result = await persister.GetNextChunk(now);
