@@ -1,9 +1,9 @@
-namespace NServiceBus
+namespace NServiceBus.Persistence.NonDurable
 {
     using System;
     using Configuration.AdvancedExtensibility;
     using Features;
-    using NServiceBus.Outbox;
+    using Outbox;
 
     /// <summary>
     /// Contains NonDurableOutbox-related settings extensions.
