@@ -9,7 +9,7 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
-    
+
     public class When_setting_timetokeepdeduplicationdata
     {
         [Test]
@@ -29,11 +29,11 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
                     await session.Send(order, options);
                     await Task.Delay(TimeSpan.FromSeconds(1));
                     await session.Send(order, options);
-                    
+
                     // delay and send the same message as we expect the outbox to have cleared after the delay
                     await Task.Delay(TimeSpan.FromSeconds(5));
                     await session.Send(order, options);
-                    
+
                     // end
                     var terminateOptions = new SendOptions();
                     terminateOptions.RouteToThisEndpoint();
@@ -126,10 +126,10 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
             public int Id { get; set; }
             public bool Terminate { get; set; }
         }
-        
+
         public class Terminate : ICommand
         {
-            
+
         }
 
         public class SendOrderAcknowledgement : IMessage
