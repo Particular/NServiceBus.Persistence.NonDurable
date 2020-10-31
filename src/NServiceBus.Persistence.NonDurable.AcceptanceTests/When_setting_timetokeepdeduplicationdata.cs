@@ -24,27 +24,24 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
                     options.SetMessageId(duplicateMessageId);
                     options.RouteToThisEndpoint();
 
-                    var order = new PlaceOrder {Id = 1};
+                    await session.Send(new PlaceOrder(), options);
 
-                    await session.Send(order, options);
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-                    await session.Send(order, options);
+                    // send a duplicate to be discarded since we use the same message id
+                    await session.Send(new PlaceOrder(), options);
 
-                    // delay and send the same message as we expect the outbox to have cleared after the delay
+                    // delay and send the same message as we now expect the outbox to have cleared after the delay
                     await Task.Delay(TimeSpan.FromSeconds(5));
-                    await session.Send(order, options);
+                    await session.Send(new PlaceOrder(), options);
 
-                    // end
-                    var terminateOptions = new SendOptions();
-                    terminateOptions.RouteToThisEndpoint();
-                    await session.Send(new PlaceOrder {Id = 500, Terminate = true}, terminateOptions);
+                    // terminate the test
+                    await session.SendLocal(new PlaceOrder { Terminate = true });
                 }))
                 .WithEndpoint<DownstreamEndpoint>()
                 .Done(c => c.Done)
                 .Run();
 
-            Assert.AreEqual(2, context.MessagesReceivedByDownstreamEndpoint);
-            Assert.AreEqual(3, context.MessagesReceivedByOutboxEndpoint);
+            Assert.AreEqual(3, context.MessagesReceivedByOutboxEndpoint, "Outbox endpoint should get 3 messages (1 discarded)");
+            Assert.AreEqual(2, context.MessagesReceivedByDownstreamEndpoint, "Downstream endpoint should get 2 messages");
         }
 
         public class Context : ScenarioContext
@@ -64,10 +61,8 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
                 });
             }
 
-            private class SendOrderAcknowledgementHandler : IHandleMessages<SendOrderAcknowledgement>
+            class SendOrderAcknowledgementHandler : IHandleMessages<SendOrderAcknowledgement>
             {
-                private readonly Context testContext;
-
                 public SendOrderAcknowledgementHandler(Context context)
                 {
                     testContext = context;
@@ -82,6 +77,8 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
 
                     return Task.FromResult(0);
                 }
+
+                readonly Context testContext;
             }
         }
 
@@ -94,16 +91,14 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
                     // limit to one to avoid race conditions on dispatch and this allows us to reliably check whether deduplication happens properly
                     b.LimitMessageProcessingConcurrencyTo(1);
                     b.EnableOutbox().TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3));
-                    b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromSeconds(1));
+                    b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromMilliseconds(100));
                     b.ConfigureTransport().Routing()
                         .RouteToEndpoint(typeof(SendOrderAcknowledgement), typeof(DownstreamEndpoint));
                 });
             }
 
-            private class PlaceOrderHandler : IHandleMessages<PlaceOrder>
+            class PlaceOrderHandler : IHandleMessages<PlaceOrder>
             {
-                private readonly Context testContext;
-
                 public PlaceOrderHandler(Context testContext)
                 {
                     this.testContext = testContext;
@@ -114,27 +109,26 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
                     testContext.MessagesReceivedByOutboxEndpoint++;
                     return context.Send(new SendOrderAcknowledgement
                     {
-                        Id = message.Id,
                         Terminate = message.Terminate
                     });
                 }
+
+                readonly Context testContext;
             }
         }
 
-        public class PlaceOrder : ICommand
+        public class PlaceOrder : IMessage
         {
-            public int Id { get; set; }
             public bool Terminate { get; set; }
         }
 
-        public class Terminate : ICommand
+        public class Terminate : IMessage
         {
 
         }
 
         public class SendOrderAcknowledgement : IMessage
         {
-            public int Id { get; set; }
             public bool Terminate { get; set; }
         }
     }
