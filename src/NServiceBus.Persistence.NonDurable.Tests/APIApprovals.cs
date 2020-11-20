@@ -11,7 +11,7 @@
         [Test]
         public void ApproveNonDurablePersistence()
         {
-            var publicApi = ApiGenerator.GeneratePublicApi(typeof(NonDurablePersistence).Assembly, excludeAttributes: new[] { "System.Runtime.Versioning.TargetFrameworkAttribute" });
+            var publicApi = typeof(NonDurablePersistence).Assembly.GeneratePublicApi(new ApiGeneratorOptions { ExcludeAttributes = new[] { "System.Runtime.Versioning.TargetFrameworkAttribute" } });
             Approver.Verify(publicApi);
         }
     }
