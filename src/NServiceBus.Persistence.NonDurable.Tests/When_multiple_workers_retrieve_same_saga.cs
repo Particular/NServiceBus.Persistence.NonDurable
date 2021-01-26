@@ -6,7 +6,7 @@
     using NUnit.Framework;
 
     [TestFixture]
-    internal class When_multiple_workers_retrieve_same_saga
+    class When_multiple_workers_retrieve_same_saga
     {
         [Test]
         public async Task Persister_returns_different_instance_of_saga_data()

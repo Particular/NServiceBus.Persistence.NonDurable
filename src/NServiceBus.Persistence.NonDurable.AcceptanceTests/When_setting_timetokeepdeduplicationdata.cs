@@ -1,11 +1,10 @@
-﻿using NServiceBus.Configuration.AdvancedExtensibility;
-
-namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
+﻿namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
 {
+    using NServiceBus.Configuration.AdvancedExtensibility;
     using System;
     using System.Threading.Tasks;
-    using AcceptanceTesting;
-    using AcceptanceTesting.Customization;
+    using NServiceBus.AcceptanceTesting;
+    using NServiceBus.AcceptanceTesting.Customization;
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
@@ -71,9 +70,13 @@ namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
                 public Task Handle(SendOrderAcknowledgement message, IMessageHandlerContext context)
                 {
                     if (!message.Terminate)
+                    {
                         testContext.MessagesReceivedByDownstreamEndpoint++;
+                    }
                     else
+                    {
                         testContext.Done = true;
+                    }
 
                     return Task.FromResult(0);
                 }

@@ -19,10 +19,9 @@
             context.Services.AddSingleton(typeof(IOutboxStorage), outboxStorage);
 
             var deduplicationPeriod = context.Settings.Get<TimeSpan>(TimeToKeepDeduplicationEntries);
-            TimeSpan cleanupInterval;
-            if (!context.Settings.TryGet<TimeSpan>(IntervalToCheckForDuplicateEntries, out cleanupInterval))
+            if (!context.Settings.TryGet(IntervalToCheckForDuplicateEntries, out TimeSpan cleanupInterval))
             {
-                cleanupInterval= TimeSpan.FromMinutes(1);
+                cleanupInterval = TimeSpan.FromMinutes(1);
             }
 
             context.RegisterStartupTask(new OutboxCleaner(outboxStorage, deduplicationPeriod, cleanupInterval));
