@@ -1,28 +1,25 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFrameworks>net472;netcoreapp3.1</TargetFrameworks>
-        <NoWarn>$(NoWarn);CA2007</NoWarn>
-        <IsPackable>false</IsPackable>
-        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-        <SignAssembly>true</SignAssembly>
-        <AssemblyOriginatorKeyFile>..\Test.snk</AssemblyOriginatorKeyFile>
-    </PropertyGroup>
+  <PropertyGroup>
+    <TargetFrameworks>net472;netcoreapp3.1</TargetFrameworks>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\Test.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
-        <Reference Include="System.Transactions" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NServiceBus.Persistence.NonDurable\NServiceBus.Persistence.NonDurable.csproj" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="NUnit" Version="3.13.0" />
-        <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.8.3" />
-        <PackageReference Include="Particular.Approvals" Version="0.2.0" />
-        <PackageReference Include="PublicApiGenerator" Version="10.2.0" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.8.3" />
+    <PackageReference Include="NUnit" Version="3.13.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
+  </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\NServiceBus.Persistence.NonDurable\NServiceBus.Persistence.NonDurable.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NServiceBus" Version="8.0.0-alpha.644" />
+    <PackageReference Include="Particular.Approvals" Version="0.2.0" />
+    <PackageReference Include="PublicApiGenerator" Version="10.2.0" />
+  </ItemGroup>
 
 </Project>
