@@ -1,12 +1,11 @@
 ﻿namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
 {
-    using NServiceBus.Configuration.AdvancedExtensibility;
     using System;
     using System.Threading.Tasks;
     using NServiceBus.AcceptanceTesting;
     using NServiceBus.AcceptanceTesting.Customization;
-    using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
+    using NServiceBus.Configuration.AdvancedExtensibility;
     using NUnit.Framework;
 
     public class When_setting_timetokeepdeduplicationdata
@@ -95,7 +94,7 @@
                     b.LimitMessageProcessingConcurrencyTo(1);
                     b.EnableOutbox().TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3));
                     b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromMilliseconds(100));
-                    b.ConfigureTransport().Routing()
+                    b.ConfigureRouting()
                         .RouteToEndpoint(typeof(SendOrderAcknowledgement), typeof(DownstreamEndpoint));
                 });
             }
