@@ -39,13 +39,13 @@
                 nonDurableOutboxStorage = storage;
             }
 
-            protected override Task OnStart(IMessageSession session)
+            protected override Task OnStart(IMessageSession session, CancellationToken cancellationToken = default)
             {
                 cleanupTimer = new Timer(PerformCleanup, null, intervalToCheckForDuplicates, intervalToCheckForDuplicates);
                 return Task.CompletedTask;
             }
 
-            protected override Task OnStop(IMessageSession session)
+            protected override Task OnStop(IMessageSession session, CancellationToken cancellationToken = default)
             {
                 using (var waitHandle = new ManualResetEvent(false))
                 {

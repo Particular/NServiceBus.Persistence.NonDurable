@@ -1,6 +1,7 @@
 namespace NServiceBus
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using System.Transactions;
     using Extensibility;
@@ -10,7 +11,7 @@ namespace NServiceBus
 
     class NonDurableTransactionalSynchronizedStorageAdapter : ISynchronizedStorageAdapter
     {
-        public Task<CompletableSynchronizedStorageSession> TryAdapt(OutboxTransaction transaction, ContextBag context)
+        public Task<CompletableSynchronizedStorageSession> TryAdapt(OutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = default)
         {
             if (transaction is NonDurableOutboxTransaction inMemOutboxTransaction)
             {
@@ -20,7 +21,7 @@ namespace NServiceBus
             return EmptyTask;
         }
 
-        public Task<CompletableSynchronizedStorageSession> TryAdapt(TransportTransaction transportTransaction, ContextBag context)
+        public Task<CompletableSynchronizedStorageSession> TryAdapt(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = default)
         {
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
