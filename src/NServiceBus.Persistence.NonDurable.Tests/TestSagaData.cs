@@ -30,7 +30,7 @@
 
         public IList<OrderLine> OrderLines { get; set; }
 
-        public StatusEnum Status { get; set; }
+        public Status Status { get; set; }
 
         public DateTime DateTimeProperty { get; set; }
 
@@ -49,7 +49,7 @@
         public Guid Id { get; set; }
     }
 
-    public enum StatusEnum
+    public enum Status
     {
         SomeStatus,
         AnotherStatus

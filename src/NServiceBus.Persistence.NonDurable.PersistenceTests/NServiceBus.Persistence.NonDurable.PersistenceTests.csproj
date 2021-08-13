@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NServiceBus.PersistenceTests.Sources" Version="8.0.0-alpha.1892" />
+    <PackageReference Include="NServiceBus.PersistenceTests.Sources" Version="8.0.0-alpha.1896" />
   </ItemGroup>
 
   <ItemGroup>

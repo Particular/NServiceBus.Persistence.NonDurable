@@ -19,12 +19,12 @@
             return Task.FromResult(new OutboxMessage(messageId, storedMessage.TransportOperations));
         }
 
-        public Task<OutboxTransaction> BeginTransaction(ContextBag context, CancellationToken cancellationToken = default)
+        public Task<IOutboxTransaction> BeginTransaction(ContextBag context, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<OutboxTransaction>(new NonDurableOutboxTransaction());
+            return Task.FromResult<IOutboxTransaction>(new NonDurableOutboxTransaction());
         }
 
-        public Task Store(OutboxMessage message, OutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = default)
+        public Task Store(OutboxMessage message, IOutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = default)
         {
             var tx = (NonDurableOutboxTransaction)transaction;
             tx.Enlist(() =>

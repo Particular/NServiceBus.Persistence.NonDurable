@@ -5,7 +5,7 @@
     using System.Threading.Tasks;
     using Outbox;
 
-    class NonDurableOutboxTransaction : OutboxTransaction
+    class NonDurableOutboxTransaction : IOutboxTransaction
     {
         public NonDurableOutboxTransaction()
         {
