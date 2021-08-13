@@ -5,7 +5,7 @@ namespace NServiceBus
     using System.Threading.Tasks;
     using Persistence;
 
-    class NonDurableSynchronizedStorageSession : CompletableSynchronizedStorageSession
+    class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSession
     {
         public NonDurableSynchronizedStorageSession(NonDurableTransaction transaction)
         {

@@ -7,10 +7,7 @@ namespace NServiceBus
 
     class NonDurableSynchronizedStorage : ISynchronizedStorage
     {
-        public Task<CompletableSynchronizedStorageSession> OpenSession(ContextBag contextBag, CancellationToken cancellationToken = default)
-        {
-            var session = (CompletableSynchronizedStorageSession)new NonDurableSynchronizedStorageSession();
-            return Task.FromResult(session);
-        }
+        public Task<ICompletableSynchronizedStorageSession> OpenSession(ContextBag contextBag, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ICompletableSynchronizedStorageSession>(new NonDurableSynchronizedStorageSession());
     }
 }
