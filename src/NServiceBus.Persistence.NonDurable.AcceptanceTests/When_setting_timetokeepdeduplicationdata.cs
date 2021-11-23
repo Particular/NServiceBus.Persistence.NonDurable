@@ -28,7 +28,7 @@
                     await session.Send(new PlaceOrder(), options);
 
                     // delay and send the same message as we now expect the outbox to have cleared after the delay
-                    await Task.Delay(TimeSpan.FromSeconds(10));
+                    await Task.Delay(TimeSpan.FromSeconds(30));
                     await session.Send(new PlaceOrder(), options);
 
                     // terminate the test
