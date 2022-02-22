@@ -196,8 +196,9 @@
 
                 protected override void ConfigureHowToFindSaga(SagaPropertyMapper<SupportedFieldTypesSagaData> mapper)
                 {
-                    mapper.ConfigureMapping<StartSaga>(m => m.CorrelationId).ToSaga(s => s.CorrelationId);
-                    mapper.ConfigureMapping<LoadTheSagaAgain>(m => m.DataId).ToSaga(s => s.CorrelationId);
+                    mapper.MapSaga(saga => saga.CorrelationId)
+                        .ToMessage<StartSaga>(m => m.CorrelationId)
+                        .ToMessage<LoadTheSagaAgain>(m => m.DataId);
                 }
 
                 Context testContext;
