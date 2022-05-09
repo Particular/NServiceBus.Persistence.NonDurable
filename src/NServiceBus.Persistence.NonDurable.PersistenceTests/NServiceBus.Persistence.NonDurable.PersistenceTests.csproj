@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <Compile Include="../NServiceBus.PersistenceTesting/**/*.cs" Exclude="../NServiceBus.PersistenceTesting/obj/**/*.*"></Compile>
-    <Compile Remove="$(PkgNServiceBus_PersistenceTests_Sources)/**/DeepCopy.cs"/>
+    <Compile Remove="\**\DeepCopy.cs"/> <!--To make the build green on Windows-->
   </ItemGroup>
 
 </Project>
