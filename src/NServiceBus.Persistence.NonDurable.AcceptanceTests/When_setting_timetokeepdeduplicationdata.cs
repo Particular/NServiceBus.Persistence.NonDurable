@@ -1,11 +1,11 @@
 ﻿namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Threading.Tasks;
-    using NServiceBus.AcceptanceTesting;
-    using NServiceBus.AcceptanceTesting.Customization;
+    using AcceptanceTesting;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
-    using NServiceBus.Configuration.AdvancedExtensibility;
+    using Configuration.AdvancedExtensibility;
     using NUnit.Framework;
 
     public class When_setting_timetokeepdeduplicationdata
@@ -18,70 +18,41 @@
                 {
                     var duplicateMessageId = Guid.NewGuid().ToString();
 
-                    var options = new SendOptions();
-                    options.SetMessageId(duplicateMessageId);
-                    options.RouteToThisEndpoint();
-
-                    await session.Send(new PlaceOrder(), options);
+                    //Following three messages are duplicates in the sense of NServiceBus but carry a header that allows this test to distinguish which copy of the duplicated message has been processed
+                    await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "1"));
 
                     // send a duplicate to be discarded since we use the same message id
-                    await session.Send(new PlaceOrder(), options);
+                    await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "2"));
 
                     // delay and send the same message as we now expect the outbox to have cleared after the delay
-                    await Task.Delay(TimeSpan.FromSeconds(30));
-                    await session.Send(new PlaceOrder(), options);
-
-                    // terminate the test
-                    await session.SendLocal(new PlaceOrder { Terminate = true });
+                    await Task.Delay(TimeSpan.FromSeconds(6));
+                    await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "3"));
                 }))
-                .WithEndpoint<DownstreamEndpoint>()
-                .Done(c => c.Done)
+                .Done(c => (c.ProcessedIds.ContainsKey("1") || c.ProcessedIds.ContainsKey("2")) && c.ProcessedIds.ContainsKey("3"))
                 .Run();
 
-            Assert.AreEqual(3, context.MessagesReceivedByOutboxEndpoint, "Outbox endpoint should get 3 messages (1 discarded)");
-            Assert.AreEqual(2, context.MessagesReceivedByDownstreamEndpoint, "Downstream endpoint should get 2 messages");
+            Assert.IsTrue(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), "Either copy 1 or 2 should be processed");
+            Assert.IsFalse(context.ProcessedIds.ContainsKey("1") && context.ProcessedIds.ContainsKey("2"), "Copy 1 and 2 should not both be processed");
+            Assert.IsTrue(context.ProcessedIds.ContainsKey("3"), "Copy 3 should be processed because it is sent after the expiration period");
+        }
+
+        /// <summary>
+        /// Creates send options for duplicates but adds a header that allows the test to distinguish the messages
+        /// </summary>
+        /// <returns></returns>
+        static SendOptions CreateSendOptions(string messageId, string uniqueId)
+        {
+            var options = new SendOptions();
+            options.SetMessageId(messageId);
+            options.RouteToThisEndpoint();
+            options.SetHeader("NServiceBus.Persistence.NonDurable.UniqueId", uniqueId);
+            return options;
         }
 
         public class Context : ScenarioContext
         {
-            public int MessagesReceivedByDownstreamEndpoint { get; set; }
-            public bool Done { get; set; }
+            public ConcurrentDictionary<string, bool> ProcessedIds { get; set; } = new ConcurrentDictionary<string, bool>();
             public int MessagesReceivedByOutboxEndpoint { get; set; }
-        }
-
-        public class DownstreamEndpoint : EndpointConfigurationBuilder
-        {
-            public DownstreamEndpoint()
-            {
-                EndpointSetup<DefaultServer>(b =>
-                {
-                    b.LimitMessageProcessingConcurrencyTo(1);
-                });
-            }
-
-            class SendOrderAcknowledgementHandler : IHandleMessages<SendOrderAcknowledgement>
-            {
-                public SendOrderAcknowledgementHandler(Context context)
-                {
-                    testContext = context;
-                }
-
-                public Task Handle(SendOrderAcknowledgement message, IMessageHandlerContext context)
-                {
-                    if (!message.Terminate)
-                    {
-                        testContext.MessagesReceivedByDownstreamEndpoint++;
-                    }
-                    else
-                    {
-                        testContext.Done = true;
-                    }
-
-                    return Task.FromResult(0);
-                }
-
-                readonly Context testContext;
-            }
         }
 
         public class OutboxEndpoint : EndpointConfigurationBuilder
@@ -94,8 +65,6 @@
                     b.LimitMessageProcessingConcurrencyTo(1);
                     b.EnableOutbox().TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3));
                     b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromMilliseconds(100));
-                    b.ConfigureRouting()
-                        .RouteToEndpoint(typeof(SendOrderAcknowledgement), typeof(DownstreamEndpoint));
                 });
             }
 
@@ -108,11 +77,8 @@
 
                 public Task Handle(PlaceOrder message, IMessageHandlerContext context)
                 {
-                    testContext.MessagesReceivedByOutboxEndpoint++;
-                    return context.Send(new SendOrderAcknowledgement
-                    {
-                        Terminate = message.Terminate
-                    });
+                    testContext.ProcessedIds.AddOrUpdate(context.MessageHeaders["NServiceBus.Persistence.NonDurable.UniqueId"], true, (_, __) => true);
+                    return Task.FromResult(0);
                 }
 
                 readonly Context testContext;
@@ -121,17 +87,6 @@
 
         public class PlaceOrder : IMessage
         {
-            public bool Terminate { get; set; }
-        }
-
-        public class Terminate : IMessage
-        {
-
-        }
-
-        public class SendOrderAcknowledgement : IMessage
-        {
-            public bool Terminate { get; set; }
         }
     }
 }

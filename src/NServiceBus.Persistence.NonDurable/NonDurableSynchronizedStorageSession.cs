@@ -15,7 +15,10 @@ namespace NServiceBus
 
         public void Dispose()
         {
-            Transaction = null;
+            if (ownsTransaction)
+            {
+                Transaction = null;
+            }
         }
 
         public ValueTask<bool> TryOpen(IOutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken())

@@ -8,7 +8,7 @@
     {
         protected override void Setup(FeatureConfigurationContext context)
         {
-            context.Services.AddSingleton<ICompletableSynchronizedStorageSession, NonDurableSynchronizedStorageSession>();
+            context.Services.AddScoped<ICompletableSynchronizedStorageSession, NonDurableSynchronizedStorageSession>();
         }
     }
 }
