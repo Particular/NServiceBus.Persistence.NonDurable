@@ -9,6 +9,7 @@ namespace NServiceBus
     using System.Threading.Tasks;
     using Extensibility;
     using Persistence;
+    using Persistence.NonDurable.Private;
     using Sagas;
 
     class NonDurableSagaPersister : ISagaPersister

@@ -10,9 +10,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 using System.Collections.Generic;
 using System.Reflection;
-using System.ArrayExtensions;
+using System;
 
-namespace System
+//Moved to another namespace to avoid name clash with persistence tests
+namespace NServiceBus.Persistence.NonDurable.Private
 {
 
     static class ObjectExtensions
@@ -21,7 +22,8 @@ namespace System
 
         public static bool IsPrimitive(this Type type)
         {
-            if (type == typeof(string)) return true;
+            if (type == typeof(string))
+                return true;
             return (type.IsValueType & type.IsPrimitive);
         }
 
@@ -31,11 +33,15 @@ namespace System
         }
         private static object InternalCopy(object originalObject, IDictionary<object, object> visited)
         {
-            if (originalObject == null) return null;
+            if (originalObject == null)
+                return null;
             var typeToReflect = originalObject.GetType();
-            if (IsPrimitive(typeToReflect)) return originalObject;
-            if (visited.ContainsKey(originalObject)) return visited[originalObject];
-            if (typeof(Delegate).IsAssignableFrom(typeToReflect)) return null;
+            if (IsPrimitive(typeToReflect))
+                return originalObject;
+            if (visited.ContainsKey(originalObject))
+                return visited[originalObject];
+            if (typeof(Delegate).IsAssignableFrom(typeToReflect))
+                return null;
             var cloneObject = CloneMethod.Invoke(originalObject, null);
             if (typeToReflect.IsArray)
             {
@@ -66,8 +72,10 @@ namespace System
         {
             foreach (FieldInfo fieldInfo in typeToReflect.GetFields(bindingFlags))
             {
-                if (filter != null && filter(fieldInfo) == false) continue;
-                if (IsPrimitive(fieldInfo.FieldType)) continue;
+                if (filter != null && filter(fieldInfo) == false)
+                    continue;
+                if (IsPrimitive(fieldInfo.FieldType))
+                    continue;
                 var originalFieldValue = fieldInfo.GetValue(originalObject);
                 var clonedFieldValue = InternalCopy(originalFieldValue, visited);
                 fieldInfo.SetValue(cloneObject, clonedFieldValue);
@@ -77,65 +85,64 @@ namespace System
         {
             return (T)DeepCopy((object)original);
         }
-    }
 
-    class ReferenceEqualityComparer : EqualityComparer<object>
-    {
-        public override bool Equals(object x, object y)
+        class ReferenceEqualityComparer : EqualityComparer<object>
         {
-            return ReferenceEquals(x, y);
-        }
-        public override int GetHashCode(object obj)
-        {
-            if (obj == null) return 0;
-            return obj.GetHashCode();
-        }
-    }
-
-    namespace ArrayExtensions
-    {
-        static class ArrayExtensions
-        {
-            public static void ForEach(this Array array, Action<Array, int[]> action)
+            public override bool Equals(object x, object y)
             {
-                if (array.LongLength == 0) return;
-                ArrayTraverse walker = new ArrayTraverse(array);
-                do action(array, walker.Position);
-                while (walker.Step());
+                return ReferenceEquals(x, y);
+            }
+            public override int GetHashCode(object obj)
+            {
+                if (obj == null)
+                    return 0;
+                return obj.GetHashCode();
             }
         }
-
-        internal class ArrayTraverse
+    }
+    static class ArrayExtensions
+    {
+        public static void ForEach(this Array array, Action<Array, int[]> action)
         {
-            public int[] Position;
-            private int[] maxLengths;
+            if (array.LongLength == 0)
+                return;
+            ArrayTraverse walker = new ArrayTraverse(array);
+            do
+                action(array, walker.Position);
+            while (walker.Step());
+        }
+    }
 
-            public ArrayTraverse(Array array)
+    internal class ArrayTraverse
+    {
+        public int[] Position;
+        private int[] maxLengths;
+
+        public ArrayTraverse(Array array)
+        {
+            maxLengths = new int[array.Rank];
+            for (int i = 0; i < array.Rank; ++i)
             {
-                maxLengths = new int[array.Rank];
-                for (int i = 0; i < array.Rank; ++i)
-                {
-                    maxLengths[i] = array.GetLength(i) - 1;
-                }
-                Position = new int[array.Rank];
+                maxLengths[i] = array.GetLength(i) - 1;
             }
+            Position = new int[array.Rank];
+        }
 
-            public bool Step()
+        public bool Step()
+        {
+            for (int i = 0; i < Position.Length; ++i)
             {
-                for (int i = 0; i < Position.Length; ++i)
+                if (Position[i] < maxLengths[i])
                 {
-                    if (Position[i] < maxLengths[i])
+                    Position[i]++;
+                    for (int j = 0; j < i; j++)
                     {
-                        Position[i]++;
-                        for (int j = 0; j < i; j++)
-                        {
-                            Position[j] = 0;
-                        }
-                        return true;
+                        Position[j] = 0;
                     }
+                    return true;
                 }
-                return false;
             }
+            return false;
         }
     }
 }
