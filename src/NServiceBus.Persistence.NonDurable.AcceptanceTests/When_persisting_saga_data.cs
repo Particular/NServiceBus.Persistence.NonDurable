@@ -143,27 +143,21 @@
             public Guid Guid { get; set; }
         }
 
-        public class Context : ScenarioContext
+        class Context : ScenarioContext
         {
             public SupportedFieldTypesSagaData LoadedSagaData { get; set; }
             public bool SagaDataLoaded { get; set; }
         }
 
-        public class EndpointThatHostsASaga : EndpointConfigurationBuilder
+        class EndpointThatHostsASaga : EndpointConfigurationBuilder
         {
-            public EndpointThatHostsASaga()
-            {
-                EndpointSetup<DefaultServer>();
-            }
+            public EndpointThatHostsASaga() => EndpointSetup<DefaultServer>();
 
             public class SupportedFieldTypesSaga : Saga<SupportedFieldTypesSagaData>,
                 IAmStartedByMessages<StartSaga>,
                 IHandleMessages<LoadTheSagaAgain>
             {
-                public SupportedFieldTypesSaga(Context context)
-                {
-                    testContext = context;
-                }
+                public SupportedFieldTypesSaga(Context context) => testContext = context;
 
                 public Task Handle(StartSaga message, IMessageHandlerContext context)
                 {
@@ -194,12 +188,10 @@
                     return Task.FromResult(0);
                 }
 
-                protected override void ConfigureHowToFindSaga(SagaPropertyMapper<SupportedFieldTypesSagaData> mapper)
-                {
+                protected override void ConfigureHowToFindSaga(SagaPropertyMapper<SupportedFieldTypesSagaData> mapper) =>
                     mapper.MapSaga(saga => saga.CorrelationId)
                         .ToMessage<StartSaga>(m => m.CorrelationId)
                         .ToMessage<LoadTheSagaAgain>(m => m.DataId);
-                }
 
                 Context testContext;
             }

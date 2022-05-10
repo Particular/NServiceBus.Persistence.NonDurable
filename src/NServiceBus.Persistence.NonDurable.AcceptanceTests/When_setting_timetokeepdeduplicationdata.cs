@@ -10,6 +10,8 @@
 
     public class When_setting_timetokeepdeduplicationdata
     {
+        const string NServiceBusPersistenceNonDurableUniqueIdHeader = "NServiceBus.Persistence.NonDurable.UniqueId";
+
         [Test]
         public async Task Should_ignore_duplicates_only_within_time_configured()
         {
@@ -28,7 +30,7 @@
                     await Task.Delay(TimeSpan.FromSeconds(6));
                     await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "3"));
                 }))
-                .Done(c => (c.ProcessedIds.ContainsKey("1") || c.ProcessedIds.ContainsKey("2")) && c.ProcessedIds.ContainsKey("3"))
+                .Done(c => (c.ProcessedIds.TryGetValue("1", out _) || c.ProcessedIds.TryGetValue("2", out _)) && c.ProcessedIds.TryGetValue("3", out _))
                 .Run();
 
             Assert.IsTrue(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), "Either copy 1 or 2 should be processed");
@@ -45,17 +47,16 @@
             var options = new SendOptions();
             options.SetMessageId(messageId);
             options.RouteToThisEndpoint();
-            options.SetHeader("NServiceBus.Persistence.NonDurable.UniqueId", uniqueId);
+            options.SetHeader(NServiceBusPersistenceNonDurableUniqueIdHeader, uniqueId);
             return options;
         }
 
-        public class Context : ScenarioContext
+        class Context : ScenarioContext
         {
-            public ConcurrentDictionary<string, bool> ProcessedIds { get; set; } = new ConcurrentDictionary<string, bool>();
-            public int MessagesReceivedByOutboxEndpoint { get; set; }
+            public ConcurrentDictionary<string, bool> ProcessedIds { get; } = new ConcurrentDictionary<string, bool>();
         }
 
-        public class OutboxEndpoint : EndpointConfigurationBuilder
+        class OutboxEndpoint : EndpointConfigurationBuilder
         {
             public OutboxEndpoint()
             {
@@ -70,15 +71,12 @@
 
             class PlaceOrderHandler : IHandleMessages<PlaceOrder>
             {
-                public PlaceOrderHandler(Context testContext)
-                {
-                    this.testContext = testContext;
-                }
+                public PlaceOrderHandler(Context testContext) => this.testContext = testContext;
 
                 public Task Handle(PlaceOrder message, IMessageHandlerContext context)
                 {
-                    testContext.ProcessedIds.AddOrUpdate(context.MessageHeaders["NServiceBus.Persistence.NonDurable.UniqueId"], true, (_, __) => true);
-                    return Task.FromResult(0);
+                    testContext.ProcessedIds[context.MessageHeaders[NServiceBusPersistenceNonDurableUniqueIdHeader]] = true;
+                    return Task.CompletedTask;
                 }
 
                 readonly Context testContext;

@@ -7,8 +7,5 @@ using NUnit.Framework;
 public class NonDurableTestSetup
 {
     [OneTimeSetUp]
-    public void SetupFixture()
-    {
-        typeof(NonDurablePersistence).ToString();
-    }
+    public void SetupFixture() => typeof(NonDurablePersistence).ToString();
 }
