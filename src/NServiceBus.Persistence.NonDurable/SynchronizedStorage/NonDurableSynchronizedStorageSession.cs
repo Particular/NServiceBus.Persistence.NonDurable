@@ -36,7 +36,7 @@ namespace NServiceBus
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
                 Transaction = new NonDurableTransaction();
-                ownsTransaction = true; //TODO: Really?
+                ownsTransaction = true;
                 ambientTransaction.EnlistVolatile(new EnlistmentNotification2(Transaction), EnlistmentOptions.None);
                 return new ValueTask<bool>(true);
             }
@@ -59,19 +59,13 @@ namespace NServiceBus
             return Task.CompletedTask;
         }
 
-        public void Enlist(Action action)
-        {
-            Transaction.Enlist(action);
-        }
+        public void Enlist(Action action) => Transaction.Enlist(action);
 
         bool ownsTransaction;
 
         class EnlistmentNotification2 : IEnlistmentNotification
         {
-            public EnlistmentNotification2(NonDurableTransaction transaction)
-            {
-                this.transaction = transaction;
-            }
+            public EnlistmentNotification2(NonDurableTransaction transaction) => this.transaction = transaction;
 
             public void Prepare(PreparingEnlistment preparingEnlistment)
             {
@@ -86,10 +80,7 @@ namespace NServiceBus
                 }
             }
 
-            public void Commit(Enlistment enlistment)
-            {
-                enlistment.Done();
-            }
+            public void Commit(Enlistment enlistment) => enlistment.Done();
 
             public void Rollback(Enlistment enlistment)
             {
@@ -97,10 +88,7 @@ namespace NServiceBus
                 enlistment.Done();
             }
 
-            public void InDoubt(Enlistment enlistment)
-            {
-                enlistment.Done();
-            }
+            public void InDoubt(Enlistment enlistment) => enlistment.Done();
 
             readonly NonDurableTransaction transaction;
         }
