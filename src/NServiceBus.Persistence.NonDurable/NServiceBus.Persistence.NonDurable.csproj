@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup Label="Public dependencies">
-    <PackageReference Include="NServiceBus" Version="8.0.0-storagession.2" />
+    <PackageReference Include="NServiceBus" Version="[8.0.0-storagession.2, 9.0.0]" />
   </ItemGroup>
 
   <ItemGroup Label="Private dependencies">
