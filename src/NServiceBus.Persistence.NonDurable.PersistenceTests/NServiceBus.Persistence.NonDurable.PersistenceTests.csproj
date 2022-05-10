@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../NServiceBus.PersistenceTesting/**/*.cs" Exclude="../NServiceBus.PersistenceTesting/obj/**/*.*" ></Compile>
+    <Compile Include="../NServiceBus.PersistenceTesting/**/*.cs" Exclude="../NServiceBus.PersistenceTesting/obj/**/*.*" />
   </ItemGroup>
 
 </Project>
