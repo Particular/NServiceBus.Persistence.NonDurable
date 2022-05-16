@@ -17,6 +17,7 @@
             };
             var persister = new NonDurableSagaPersister();
             var insertSession = new NonDurableSynchronizedStorageSession();
+            await insertSession.Open(new ContextBag());
             await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), insertSession, new ContextBag());
             await insertSession.CompleteAsync();
 
@@ -40,6 +41,7 @@
             };
             var persister = new NonDurableSagaPersister();
             var insertSession = new NonDurableSynchronizedStorageSession();
+            await insertSession.Open(new ContextBag());
             await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), insertSession, new ContextBag());
             await insertSession.CompleteAsync();
 
@@ -51,7 +53,10 @@
                 new NonDurableSynchronizedStorageSession(), losingContext);
 
             var winningSaveSession = new NonDurableSynchronizedStorageSession();
+            await winningSaveSession.Open(new ContextBag());
             var losingSaveSession = new NonDurableSynchronizedStorageSession();
+            await losingSaveSession.Open(new ContextBag());
+
             await persister.Update(returnedSaga1, winningSaveSession, winningContext);
             await persister.Update(returnedSaga2, losingSaveSession, losingContext);
 
@@ -74,6 +79,7 @@
             };
             var persister = new NonDurableSagaPersister();
             var insertSession = new NonDurableSynchronizedStorageSession();
+            await insertSession.Open(new ContextBag());
             await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), insertSession, new ContextBag());
             await insertSession.CompleteAsync();
 
@@ -85,7 +91,9 @@
                 new NonDurableSynchronizedStorageSession(), losingContext);
 
             var winningSaveSession = new NonDurableSynchronizedStorageSession();
+            await winningSaveSession.Open(new ContextBag());
             var losingSaveSession = new NonDurableSynchronizedStorageSession();
+            await losingSaveSession.Open(new ContextBag());
 
             await persister.Update(record, winningSaveSession, winningContext);
             await persister.Update(staleRecord, losingSaveSession, losingContext);
@@ -107,6 +115,7 @@
             };
             var persister = new NonDurableSagaPersister();
             var insertSession = new NonDurableSynchronizedStorageSession();
+            await insertSession.Open(new ContextBag());
             await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), insertSession, new ContextBag());
             await insertSession.CompleteAsync();
 
@@ -115,7 +124,9 @@
                 await persister.Get<TestSagaData>(saga.Id, new NonDurableSynchronizedStorageSession(), retrievingContext);
 
             var winningSaveSession = new NonDurableSynchronizedStorageSession();
+            await winningSaveSession.Open(new ContextBag());
             var losingSaveSession = new NonDurableSynchronizedStorageSession();
+            await losingSaveSession.Open(new ContextBag());
 
             await persister.Update(returnedSaga1, winningSaveSession, retrievingContext);
             await persister.Update(returnedSaga1, losingSaveSession, retrievingContext);
@@ -139,6 +150,7 @@
             };
             var persister = new NonDurableSagaPersister();
             var insertSession = new NonDurableSynchronizedStorageSession();
+            await insertSession.Open(new ContextBag());
             await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), insertSession, new ContextBag());
             await insertSession.CompleteAsync();
 
@@ -151,7 +163,9 @@
                 new NonDurableSynchronizedStorageSession(), losingSessionContext);
 
             var winningSaveSession = new NonDurableSynchronizedStorageSession();
+            await winningSaveSession.Open(new ContextBag());
             var losingSaveSession = new NonDurableSynchronizedStorageSession();
+            await losingSaveSession.Open(new ContextBag());
 
             await persister.Update(returnedSaga1, winningSaveSession, winningSessionContext);
             await persister.Update(returnedSaga2, losingSaveSession, losingSessionContext);
@@ -171,7 +185,9 @@
                 winningSessionContext);
 
             winningSaveSession = new NonDurableSynchronizedStorageSession();
+            await winningSaveSession.Open(new ContextBag());
             losingSaveSession = new NonDurableSynchronizedStorageSession();
+            await losingSaveSession.Open(new ContextBag());
 
             await persister.Update(returnedSaga4, winningSaveSession, winningSessionContext);
             await persister.Update(returnedSaga3, losingSaveSession, losingSessionContext);

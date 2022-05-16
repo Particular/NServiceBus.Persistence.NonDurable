@@ -8,13 +8,11 @@
         public Task Configure(string endpointName, EndpointConfiguration configuration, RunSettings settings, PublisherMetadata publisherMetadata)
         {
             configuration.UsePersistence<NonDurablePersistence>();
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
-        public Task Cleanup()
-        {
+        public Task Cleanup() =>
             // Nothing required for non-durable persistence
-            return Task.FromResult(0);
-        }
+            Task.CompletedTask;
     }
 }

@@ -10,18 +10,9 @@
     {
         internal NonDurablePersistence()
         {
-            Supports<StorageType.Sagas>(s =>
-            {
-                s.EnableFeatureByDefault<NonDurableSagaPersistence>();
-                s.EnableFeatureByDefault<NonDurableTransactionalStorageFeature>();
-            });
-
+            Supports<StorageType.Sagas>(s => s.EnableFeatureByDefault<NonDurableSagaPersistence>());
             Supports<StorageType.Subscriptions>(s => s.EnableFeatureByDefault<NonDurableSubscriptionPersistence>());
-            Supports<StorageType.Outbox>(s =>
-            {
-                s.EnableFeatureByDefault<NonDurableOutboxPersistence>();
-                s.EnableFeatureByDefault<NonDurableTransactionalStorageFeature>();
-            });
+            Supports<StorageType.Outbox>(s => s.EnableFeatureByDefault<NonDurableOutboxPersistence>());
         }
     }
 }

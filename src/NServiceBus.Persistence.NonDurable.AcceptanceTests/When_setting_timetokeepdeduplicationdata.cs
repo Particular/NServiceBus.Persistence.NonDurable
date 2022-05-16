@@ -1,15 +1,17 @@
 ﻿namespace NServiceBus.Persistence.NonDurable.AcceptanceTests
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Threading.Tasks;
-    using NServiceBus.AcceptanceTesting;
-    using NServiceBus.AcceptanceTesting.Customization;
+    using AcceptanceTesting;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
-    using NServiceBus.Configuration.AdvancedExtensibility;
+    using Configuration.AdvancedExtensibility;
     using NUnit.Framework;
 
     public class When_setting_timetokeepdeduplicationdata
     {
+        const string NServiceBusPersistenceNonDurableUniqueIdHeader = "NServiceBus.Persistence.NonDurable.UniqueId";
+
         [Test]
         public async Task Should_ignore_duplicates_only_within_time_configured()
         {
@@ -18,73 +20,43 @@
                 {
                     var duplicateMessageId = Guid.NewGuid().ToString();
 
-                    var options = new SendOptions();
-                    options.SetMessageId(duplicateMessageId);
-                    options.RouteToThisEndpoint();
-
-                    await session.Send(new PlaceOrder(), options);
+                    //Following three messages are duplicates in the sense of NServiceBus but carry a header that allows this test to distinguish which copy of the duplicated message has been processed
+                    await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "1"));
 
                     // send a duplicate to be discarded since we use the same message id
-                    await session.Send(new PlaceOrder(), options);
+                    await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "2"));
 
                     // delay and send the same message as we now expect the outbox to have cleared after the delay
-                    await Task.Delay(TimeSpan.FromSeconds(30));
-                    await session.Send(new PlaceOrder(), options);
-
-                    // terminate the test
-                    await session.SendLocal(new PlaceOrder { Terminate = true });
+                    await Task.Delay(TimeSpan.FromSeconds(6));
+                    await session.Send(new PlaceOrder(), CreateSendOptions(duplicateMessageId, "3"));
                 }))
-                .WithEndpoint<DownstreamEndpoint>()
-                .Done(c => c.Done)
+                .Done(c => (c.ProcessedIds.TryGetValue("1", out _) || c.ProcessedIds.TryGetValue("2", out _)) && c.ProcessedIds.TryGetValue("3", out _))
                 .Run();
 
-            Assert.AreEqual(3, context.MessagesReceivedByOutboxEndpoint, "Outbox endpoint should get 3 messages (1 discarded)");
-            Assert.AreEqual(2, context.MessagesReceivedByDownstreamEndpoint, "Downstream endpoint should get 2 messages");
+            Assert.IsTrue(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), "Either copy 1 or 2 should be processed");
+            Assert.IsFalse(context.ProcessedIds.ContainsKey("1") && context.ProcessedIds.ContainsKey("2"), "Copy 1 and 2 should not both be processed");
+            Assert.IsTrue(context.ProcessedIds.ContainsKey("3"), "Copy 3 should be processed because it is sent after the expiration period");
         }
 
-        public class Context : ScenarioContext
+        /// <summary>
+        /// Creates send options for duplicates but adds a header that allows the test to distinguish the messages
+        /// </summary>
+        /// <returns></returns>
+        static SendOptions CreateSendOptions(string messageId, string uniqueId)
         {
-            public int MessagesReceivedByDownstreamEndpoint { get; set; }
-            public bool Done { get; set; }
-            public int MessagesReceivedByOutboxEndpoint { get; set; }
+            var options = new SendOptions();
+            options.SetMessageId(messageId);
+            options.RouteToThisEndpoint();
+            options.SetHeader(NServiceBusPersistenceNonDurableUniqueIdHeader, uniqueId);
+            return options;
         }
 
-        public class DownstreamEndpoint : EndpointConfigurationBuilder
+        class Context : ScenarioContext
         {
-            public DownstreamEndpoint()
-            {
-                EndpointSetup<DefaultServer>(b =>
-                {
-                    b.LimitMessageProcessingConcurrencyTo(1);
-                });
-            }
-
-            class SendOrderAcknowledgementHandler : IHandleMessages<SendOrderAcknowledgement>
-            {
-                public SendOrderAcknowledgementHandler(Context context)
-                {
-                    testContext = context;
-                }
-
-                public Task Handle(SendOrderAcknowledgement message, IMessageHandlerContext context)
-                {
-                    if (!message.Terminate)
-                    {
-                        testContext.MessagesReceivedByDownstreamEndpoint++;
-                    }
-                    else
-                    {
-                        testContext.Done = true;
-                    }
-
-                    return Task.FromResult(0);
-                }
-
-                readonly Context testContext;
-            }
+            public ConcurrentDictionary<string, bool> ProcessedIds { get; } = new ConcurrentDictionary<string, bool>();
         }
 
-        public class OutboxEndpoint : EndpointConfigurationBuilder
+        class OutboxEndpoint : EndpointConfigurationBuilder
         {
             public OutboxEndpoint()
             {
@@ -92,27 +64,20 @@
                 {
                     // limit to one to avoid race conditions on dispatch and this allows us to reliably check whether deduplication happens properly
                     b.LimitMessageProcessingConcurrencyTo(1);
+                    b.ConfigureTransport().TransportTransactionMode = TransportTransactionMode.ReceiveOnly;
                     b.EnableOutbox().TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3));
                     b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromMilliseconds(100));
-                    b.ConfigureRouting()
-                        .RouteToEndpoint(typeof(SendOrderAcknowledgement), typeof(DownstreamEndpoint));
                 });
             }
 
             class PlaceOrderHandler : IHandleMessages<PlaceOrder>
             {
-                public PlaceOrderHandler(Context testContext)
-                {
-                    this.testContext = testContext;
-                }
+                public PlaceOrderHandler(Context testContext) => this.testContext = testContext;
 
                 public Task Handle(PlaceOrder message, IMessageHandlerContext context)
                 {
-                    testContext.MessagesReceivedByOutboxEndpoint++;
-                    return context.Send(new SendOrderAcknowledgement
-                    {
-                        Terminate = message.Terminate
-                    });
+                    testContext.ProcessedIds[context.MessageHeaders[NServiceBusPersistenceNonDurableUniqueIdHeader]] = true;
+                    return Task.CompletedTask;
                 }
 
                 readonly Context testContext;
@@ -121,17 +86,6 @@
 
         public class PlaceOrder : IMessage
         {
-            public bool Terminate { get; set; }
-        }
-
-        public class Terminate : IMessage
-        {
-
-        }
-
-        public class SendOrderAcknowledgement : IMessage
-        {
-            public bool Terminate { get; set; }
         }
     }
 }

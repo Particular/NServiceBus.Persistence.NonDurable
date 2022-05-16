@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.PersistenceTesting
 {
+    using System;
     using System.Threading;
     using System.Threading.Tasks;
     using NServiceBus;
@@ -21,9 +22,7 @@
 
         public ISagaPersister SagaStorage { get; private set; }
 
-        public ISynchronizedStorage SynchronizedStorage { get; private set; }
-
-        public ISynchronizedStorageAdapter SynchronizedStorageAdapter { get; private set; }
+        public Func<ICompletableSynchronizedStorageSession> CreateStorageSession { get; private set; }
 
         public IOutboxStorage OutboxStorage { get; private set; }
 
@@ -31,8 +30,7 @@
         {
             SagaIdGenerator = new DefaultSagaIdGenerator();
             SagaStorage = new NonDurableSagaPersister();
-            SynchronizedStorage = new NonDurableSynchronizedStorage();
-            SynchronizedStorageAdapter = new NonDurableTransactionalSynchronizedStorageAdapter();
+            CreateStorageSession = () => new NonDurableSynchronizedStorageSession();
             OutboxStorage = new NonDurableOutboxStorage();
 
             return Task.CompletedTask;
@@ -42,5 +40,6 @@
         {
             return Task.CompletedTask;
         }
+
     }
 }
