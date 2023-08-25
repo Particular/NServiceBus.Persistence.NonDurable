@@ -3,6 +3,7 @@
     using System;
     using System.Threading;
     using System.Threading.Tasks;
+    using System.Transactions;
     using NServiceBus;
     using NServiceBus.Outbox;
     using NServiceBus.Sagas;
@@ -10,7 +11,7 @@
 
     public partial class PersistenceTestsConfiguration
     {
-        public bool SupportsDtc => true;
+        public bool SupportsDtc => OperatingSystem.IsWindows();
 
         public bool SupportsOutbox => true;
 
@@ -28,6 +29,11 @@
 
         public Task Configure(CancellationToken cancellationToken = default)
         {
+            if (OperatingSystem.IsWindows())
+            {
+                TransactionManager.ImplicitDistributedTransactions = true;
+            }
+
             SagaIdGenerator = new DefaultSagaIdGenerator();
             SagaStorage = new NonDurableSagaPersister();
             CreateStorageSession = () => new NonDurableSynchronizedStorageSession();
