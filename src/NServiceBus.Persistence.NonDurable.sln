@@ -7,7 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Persistence.Non
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{56CD0035-2E2C-4EE2-B024-4F4056B22AB1}"
 	ProjectSection(SolutionItems) = preProject
+		..\.github\workflows\ci.yml = ..\.github\workflows\ci.yml
 		Custom.Build.props = Custom.Build.props
+		..\.github\workflows\release.yml = ..\.github\workflows\release.yml
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Persistence.NonDurable.PersistenceTests", "NServiceBus.Persistence.NonDurable.PersistenceTests\NServiceBus.Persistence.NonDurable.PersistenceTests.csproj", "{B60CAEC8-D102-4336-ADF5-CCD1D8AC1B8D}"
