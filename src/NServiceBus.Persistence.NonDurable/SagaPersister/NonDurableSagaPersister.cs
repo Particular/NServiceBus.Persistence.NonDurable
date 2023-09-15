@@ -115,7 +115,7 @@ namespace NServiceBus
         {
             if (context.TryGet(ContextKey, out Dictionary<Guid, Entry> entries) == false)
             {
-                entries = new Dictionary<Guid, Entry>();
+                entries = [];
                 context.Set(ContextKey, entries);
             }
             entries[sagaId] = value;
