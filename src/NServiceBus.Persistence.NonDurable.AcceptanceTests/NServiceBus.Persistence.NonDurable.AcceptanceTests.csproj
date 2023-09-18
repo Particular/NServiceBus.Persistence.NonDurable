@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="9.0.0-alpha.1" />
+    <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="9.0.0-alpha.4" />
   </ItemGroup>
 
   <ItemGroup>
