@@ -80,9 +80,7 @@ namespace NServiceBus
 
         public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         {
-            var nonDurableSession = (NonDurableSynchronizedStorageSession)session;
-
-            nonDurableSession.Enlist(() =>
+            ((NonDurableSynchronizedStorageSession)session).Enlist(() =>
             {
                 var correlationId = NoCorrelationId;
                 if (correlationProperty != SagaCorrelationProperty.None)
@@ -112,10 +110,9 @@ namespace NServiceBus
 
         public Task Update(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         {
-            var nonDurableSession = (NonDurableSynchronizedStorageSession)session;
             var entry = GetEntry(context, sagaData.Id);
 
-            nonDurableSession?.Enlist(() =>
+            ((NonDurableSynchronizedStorageSession)session).Enlist(() =>
             {
                 if (sagas.TryUpdate(sagaData.Id, entry.UpdateTo(sagaData), entry) == false)
                 {
