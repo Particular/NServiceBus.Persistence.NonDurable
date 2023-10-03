@@ -34,6 +34,7 @@ namespace NServiceBus
             {
                 Transaction = new NonDurableTransaction();
                 ownsTransaction = true;
+                enlistedTransaction = true;
                 ambientTransaction.EnlistVolatile(new EnlistmentNotification2(Transaction), EnlistmentOptions.None);
                 return new ValueTask<bool>(true);
             }
@@ -49,16 +50,18 @@ namespace NServiceBus
 
         public Task CompleteAsync(CancellationToken cancellationToken = default)
         {
-            if (ownsTransaction)
+            if (ownsTransaction && !enlistedTransaction)
             {
                 Transaction.Commit();
             }
+
             return Task.CompletedTask;
         }
 
-        public void Enlist(Action action) => Transaction.Enlist(action);
+        public void Enlist(Action action, Action rollbackAction) => Transaction.Enlist(action, rollbackAction);
 
         bool ownsTransaction;
+        bool enlistedTransaction;
 
         class EnlistmentNotification2 : IEnlistmentNotification
         {

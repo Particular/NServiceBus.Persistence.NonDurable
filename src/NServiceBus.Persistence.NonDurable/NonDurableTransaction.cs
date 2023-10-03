@@ -5,7 +5,15 @@ namespace NServiceBus
 
     class NonDurableTransaction
     {
-        public void Enlist(Action action) => actions.Add(action);
+        public void Enlist(Action action, Action rollbackAction = null)
+        {
+            actions.Add(action);
+
+            if (rollbackAction != null)
+            {
+                rollbackActions.Add(rollbackAction);
+            }
+        }
 
         public void Commit()
         {
@@ -16,8 +24,17 @@ namespace NServiceBus
             actions.Clear();
         }
 
-        public void Rollback() => actions.Clear();
+        public void Rollback()
+        {
+            foreach (var action in rollbackActions)
+            {
+                action();
+            }
+
+            rollbackActions.Clear();
+        }
 
         List<Action> actions = new List<Action>();
+        List<Action> rollbackActions = new List<Action>();
     }
 }
