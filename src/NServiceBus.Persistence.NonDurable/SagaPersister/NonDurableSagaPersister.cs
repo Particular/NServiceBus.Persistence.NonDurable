@@ -25,21 +25,27 @@ namespace NServiceBus
         public Task Complete(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         {
             ((NonDurableSynchronizedStorageSession)session).Enlist(() =>
-           {
-               var entry = GetEntry(context, sagaData.Id);
+            {
+                var entry = GetEntry(context, sagaData.Id);
 
-               if (sagasCollection.Remove(new KeyValuePair<Guid, Entry>(sagaData.Id, entry)) == false)
-               {
-                   throw new Exception("Saga can't be completed as it was updated by another process.");
-               }
+                if (sagasCollection.Remove(new KeyValuePair<Guid, Entry>(sagaData.Id, entry)) == false)
+                {
+                    throw new Exception("Saga can't be completed as it was updated by another process.");
+                }
 
-               // saga removed
-               // clean the index
-               if (Equals(entry.CorrelationId, NoCorrelationId) == false)
-               {
-                   byCorrelationIdCollection.Remove(new KeyValuePair<CorrelationId, Guid>(entry.CorrelationId, sagaData.Id));
-               }
-           });
+                // saga removed
+                // clean the index
+                if (Equals(entry.CorrelationId, NoCorrelationId) == false)
+                {
+                    byCorrelationIdCollection.Remove(new KeyValuePair<CorrelationId, Guid>(entry.CorrelationId, sagaData.Id));
+                }
+            },
+            rollbackAction: () =>
+            {
+                var entry = GetEntry(context, sagaData.Id);
+                sagasCollection.Add(new KeyValuePair<Guid, Entry>(sagaData.Id, entry));
+                byCorrelationId.TryAdd(entry.CorrelationId, sagaData.Id);
+            });
 
             return Task.CompletedTask;
         }
@@ -74,39 +80,56 @@ namespace NServiceBus
 
         public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         {
-            ((NonDurableSynchronizedStorageSession)session).Enlist(() =>
-           {
-               var correlationId = NoCorrelationId;
-               if (correlationProperty != SagaCorrelationProperty.None)
-               {
-                   correlationId = new CorrelationId(sagaData.GetType(), correlationProperty);
-                   if (byCorrelationId.TryAdd(correlationId, sagaData.Id) == false)
-                   {
-                       throw new InvalidOperationException($"The saga with the correlation id 'Name: {correlationProperty.Name} Value: {correlationProperty.Value}' already exists");
-                   }
-               }
+            var nonDurableSession = (NonDurableSynchronizedStorageSession)session;
 
-               var entry = new Entry(sagaData, correlationId);
-               if (sagas.TryAdd(sagaData.Id, entry) == false)
-               {
-                   throw new Exception("A saga with this identifier already exists. This should never happened as saga identifier are meant to be unique.");
-               }
-           });
+            nonDurableSession.Enlist(() =>
+            {
+                var correlationId = NoCorrelationId;
+                if (correlationProperty != SagaCorrelationProperty.None)
+                {
+                    correlationId = new CorrelationId(sagaData.GetType(), correlationProperty);
+                    if (byCorrelationId.TryAdd(correlationId, sagaData.Id) == false)
+                    {
+                        throw new InvalidOperationException($"The saga with the correlation id 'Name: {correlationProperty.Name} Value: {correlationProperty.Value}' already exists");
+                    }
+                }
+
+                var entry = new Entry(sagaData, correlationId);
+                if (sagas.TryAdd(sagaData.Id, entry) == false)
+                {
+                    throw new Exception("A saga with this identifier already exists. This should never happened as saga identifier are meant to be unique.");
+                }
+            },
+            rollbackAction: () =>
+            {
+                _ = sagas.TryRemove(sagaData.Id, out var entry);
+                _ = byCorrelationId.Remove(entry.CorrelationId, out Guid value);
+
+            });
 
             return Task.CompletedTask;
         }
 
         public Task Update(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         {
-            ((NonDurableSynchronizedStorageSession)session).Enlist(() =>
-           {
-               var entry = GetEntry(context, sagaData.Id);
+            var nonDurableSession = (NonDurableSynchronizedStorageSession)session;
+            var entry = GetEntry(context, sagaData.Id);
 
-               if (sagas.TryUpdate(sagaData.Id, entry.UpdateTo(sagaData), entry) == false)
-               {
-                   throw new Exception($"NonDurableSagaPersister concurrency violation: saga entity Id[{sagaData.Id}] already saved.");
-               }
-           });
+            nonDurableSession?.Enlist(() =>
+            {
+                if (sagas.TryUpdate(sagaData.Id, entry.UpdateTo(sagaData), entry) == false)
+                {
+                    throw new Exception($"NonDurableSagaPersister concurrency violation: saga entity Id[{sagaData.Id}] already saved.");
+                }
+            },
+            rollbackAction: () =>
+            {
+                var oldEntry = GetEntry(context, sagaData.Id);
+                if (sagas.TryGetValue(sagaData.Id, out var newEntry))
+                {
+                    _ = sagas.TryUpdate(sagaData.Id, oldEntry, newEntry);
+                }
+            });
 
             return Task.CompletedTask;
         }
