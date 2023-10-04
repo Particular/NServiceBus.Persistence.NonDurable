@@ -76,6 +76,7 @@ namespace NServiceBus
                 }
                 catch (Exception ex)
                 {
+                    transaction.Rollback();
                     preparingEnlistment.ForceRollback(ex);
                 }
             }

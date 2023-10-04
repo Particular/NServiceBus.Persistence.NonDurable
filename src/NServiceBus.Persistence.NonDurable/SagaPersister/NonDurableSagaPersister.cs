@@ -101,8 +101,11 @@ namespace NServiceBus
             rollbackAction: () =>
             {
                 _ = sagas.TryRemove(sagaData.Id, out var entry);
-                _ = byCorrelationId.Remove(entry.CorrelationId, out Guid value);
 
+                if (correlationProperty != SagaCorrelationProperty.None)
+                {
+                    _ = byCorrelationId.Remove(entry.CorrelationId, out Guid value);
+                }
             });
 
             return Task.CompletedTask;
