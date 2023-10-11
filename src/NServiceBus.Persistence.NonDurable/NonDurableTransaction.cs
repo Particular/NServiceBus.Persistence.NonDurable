@@ -34,7 +34,7 @@ namespace NServiceBus
             rollbackActions.Clear();
         }
 
-        List<Action> actions = []];
-        List<Action> rollbackActions = []];
+        List<Action> actions = [];
+        List<Action> rollbackActions = [];
     }
 }
