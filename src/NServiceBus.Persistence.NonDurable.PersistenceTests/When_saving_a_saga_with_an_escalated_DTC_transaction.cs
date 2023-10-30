@@ -99,15 +99,15 @@
             public void Commit(Enlistment enlistment)
             {
                 CommitWasCalled = true;
-                CompletionSource.SetResult();
                 enlistment.Done();
+                CompletionSource.SetResult();
             }
 
             public void Rollback(Enlistment enlistment)
             {
                 RollbackWasCalled = true;
-                CompletionSource.SetResult();
                 enlistment.Done();
+                CompletionSource.SetResult();
             }
 
             public void InDoubt(Enlistment enlistment)
