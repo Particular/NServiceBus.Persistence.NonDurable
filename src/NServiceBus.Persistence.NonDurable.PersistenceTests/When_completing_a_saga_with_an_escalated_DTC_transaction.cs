@@ -21,6 +21,7 @@
             // This enlistment notifier emulates a participating DTC transaction that fails to commit.
             var enlistmentNotifier = new EnlistmentNotifier(abortTransaction: true);
             Transaction transaction = null;
+            NonDurableSynchronizedStorageSession.EnlistmentNotification2 enlistmentNotification = null;
 
             Assert.That(async () =>
             {
@@ -35,7 +36,7 @@
                 using var session = configuration.CreateStorageSession();
                 var contextBag = configuration.GetContextBagForSagaStorage();
 
-                await session.TryOpen(transportTransaction, contextBag);
+                await ((NonDurableSynchronizedStorageSession)session).TryOpen(transportTransaction, out enlistmentNotification);
 
                 var sagaData = await configuration.SagaStorage.Get<TestSagaData>(startingSagaData.Id, session, contextBag);
                 await configuration.SagaStorage.Complete(sagaData, session, contextBag);
@@ -45,6 +46,8 @@
                 // When the enlistmentNotifier forces a rollback, the persister should also rollback with the rest of the DTC transaction.
                 tx.Complete();
             }, Throws.Exception.TypeOf<TransactionAbortedException>());
+
+            await enlistmentNotification.TransactionCompletionSource.Task;
 
             var unchangedSagaData = await GetById<TestSagaData>(startingSagaData.Id);
 
