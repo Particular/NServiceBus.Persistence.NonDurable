@@ -17,11 +17,17 @@ namespace NServiceBus
 
         public void Commit()
         {
+            if (transactionIsCommitted)
+            {
+                throw new InvalidOperationException("The transaction has already been committed.");
+            }
+
             foreach (var action in actions)
             {
                 action();
             }
-            actions.Clear();
+
+            transactionIsCommitted = true;
         }
 
         public void Rollback()
@@ -30,10 +36,9 @@ namespace NServiceBus
             {
                 action();
             }
-
-            rollbackActions.Clear();
         }
 
+        bool transactionIsCommitted = false;
         List<Action> actions = [];
         List<Action> rollbackActions = [];
     }
