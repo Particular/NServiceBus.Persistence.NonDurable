@@ -35,8 +35,8 @@ namespace NServiceBus
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
                 Transaction = new NonDurableTransaction();
-                ownsTransaction = true;
-                enlistedTransaction = true;
+                ownsNonDurableTransaction = true;
+                enlistedInAmbientTransaction = true;
                 enlistmentNotification = new EnlistmentNotification(Transaction);
                 ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
                 return new ValueTask<bool>(true);
@@ -49,13 +49,13 @@ namespace NServiceBus
         public Task Open(ContextBag contextBag, CancellationToken cancellationToken = new CancellationToken())
         {
             Transaction = new NonDurableTransaction();
-            ownsTransaction = true;
+            ownsNonDurableTransaction = true;
             return Task.CompletedTask;
         }
 
         public Task CompleteAsync(CancellationToken cancellationToken = default)
         {
-            if (ownsTransaction && !enlistedTransaction)
+            if (ownsNonDurableTransaction && !enlistedInAmbientTransaction)
             {
                 Transaction.Commit();
             }
@@ -65,8 +65,8 @@ namespace NServiceBus
 
         public void Enlist(Action action, Action rollbackAction) => Transaction.Enlist(action, rollbackAction);
 
-        bool ownsTransaction;
-        bool enlistedTransaction;
+        bool ownsNonDurableTransaction;
+        bool enlistedInAmbientTransaction;
 
         internal class EnlistmentNotification : IEnlistmentNotification
         {
