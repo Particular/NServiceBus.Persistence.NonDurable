@@ -28,41 +28,51 @@ namespace NServiceBus
             return new ValueTask<bool>(false);
         }
 
-        public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken())
+        public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken()) => TryOpen(transportTransaction, out _, cancellationToken);
+
+        internal ValueTask<bool> TryOpen(TransportTransaction transportTransaction, out EnlistmentNotification enlistmentNotification, CancellationToken cancellationToken = new CancellationToken())
         {
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
                 Transaction = new NonDurableTransaction();
-                ownsTransaction = true;
-                ambientTransaction.EnlistVolatile(new EnlistmentNotification2(Transaction), EnlistmentOptions.None);
+                ownsNonDurableTransaction = true;
+                enlistedInAmbientTransaction = true;
+                enlistmentNotification = new EnlistmentNotification(Transaction);
+                ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
                 return new ValueTask<bool>(true);
             }
+
+            enlistmentNotification = null;
             return new ValueTask<bool>(false);
         }
 
         public Task Open(ContextBag contextBag, CancellationToken cancellationToken = new CancellationToken())
         {
             Transaction = new NonDurableTransaction();
-            ownsTransaction = true;
+            ownsNonDurableTransaction = true;
             return Task.CompletedTask;
         }
 
         public Task CompleteAsync(CancellationToken cancellationToken = default)
         {
-            if (ownsTransaction)
+            if (ownsNonDurableTransaction && !enlistedInAmbientTransaction)
             {
                 Transaction.Commit();
             }
+
             return Task.CompletedTask;
         }
 
-        public void Enlist(Action action) => Transaction.Enlist(action);
+        public void Enlist(Action action, Action rollbackAction) => Transaction.Enlist(action, rollbackAction);
 
-        bool ownsTransaction;
+        bool ownsNonDurableTransaction;
+        bool enlistedInAmbientTransaction;
 
-        class EnlistmentNotification2 : IEnlistmentNotification
+        internal class EnlistmentNotification : IEnlistmentNotification
         {
-            public EnlistmentNotification2(NonDurableTransaction transaction) => this.transaction = transaction;
+            public TaskCompletionSource TransactionCompletionSource { get; private set; } = new TaskCompletionSource();
+
+            public EnlistmentNotification(NonDurableTransaction transaction) => this.transaction = transaction;
 
             public void Prepare(PreparingEnlistment preparingEnlistment)
             {
@@ -73,16 +83,22 @@ namespace NServiceBus
                 }
                 catch (Exception ex)
                 {
+                    transaction.Rollback();
                     preparingEnlistment.ForceRollback(ex);
                 }
             }
 
-            public void Commit(Enlistment enlistment) => enlistment.Done();
+            public void Commit(Enlistment enlistment)
+            {
+                enlistment.Done();
+                TransactionCompletionSource.SetResult();
+            }
 
             public void Rollback(Enlistment enlistment)
             {
                 transaction.Rollback();
                 enlistment.Done();
+                TransactionCompletionSource.SetResult();
             }
 
             public void InDoubt(Enlistment enlistment) => enlistment.Done();
