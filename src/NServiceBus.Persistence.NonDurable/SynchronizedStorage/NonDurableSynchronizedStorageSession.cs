@@ -28,16 +28,21 @@ namespace NServiceBus
             return new ValueTask<bool>(false);
         }
 
-        public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken())
+        public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken()) => TryOpen(transportTransaction, out _, cancellationToken);
+
+        internal ValueTask<bool> TryOpen(TransportTransaction transportTransaction, out EnlistmentNotification2 enlistmentNotification, CancellationToken cancellationToken = new CancellationToken())
         {
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
                 Transaction = new NonDurableTransaction();
                 ownsTransaction = true;
                 enlistedTransaction = true;
-                ambientTransaction.EnlistVolatile(new EnlistmentNotification2(Transaction), EnlistmentOptions.None);
+                enlistmentNotification = new EnlistmentNotification2(Transaction);
+                ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
                 return new ValueTask<bool>(true);
             }
+
+            enlistmentNotification = null;
             return new ValueTask<bool>(false);
         }
 
@@ -63,8 +68,10 @@ namespace NServiceBus
         bool ownsTransaction;
         bool enlistedTransaction;
 
-        class EnlistmentNotification2 : IEnlistmentNotification
+        internal class EnlistmentNotification2 : IEnlistmentNotification
         {
+            public TaskCompletionSource TransactionCompletionSource { get; private set; } = new TaskCompletionSource();
+
             public EnlistmentNotification2(NonDurableTransaction transaction) => this.transaction = transaction;
 
             public void Prepare(PreparingEnlistment preparingEnlistment)
@@ -81,12 +88,17 @@ namespace NServiceBus
                 }
             }
 
-            public void Commit(Enlistment enlistment) => enlistment.Done();
+            public void Commit(Enlistment enlistment)
+            {
+                enlistment.Done();
+                TransactionCompletionSource.SetResult();
+            }
 
             public void Rollback(Enlistment enlistment)
             {
                 transaction.Rollback();
                 enlistment.Done();
+                TransactionCompletionSource.SetResult();
             }
 
             public void InDoubt(Enlistment enlistment) => enlistment.Done();
