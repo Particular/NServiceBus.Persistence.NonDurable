@@ -30,14 +30,14 @@ namespace NServiceBus
 
         public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken()) => TryOpen(transportTransaction, out _, cancellationToken);
 
-        internal ValueTask<bool> TryOpen(TransportTransaction transportTransaction, out EnlistmentNotification2 enlistmentNotification, CancellationToken cancellationToken = new CancellationToken())
+        internal ValueTask<bool> TryOpen(TransportTransaction transportTransaction, out EnlistmentNotification enlistmentNotification, CancellationToken cancellationToken = new CancellationToken())
         {
             if (transportTransaction.TryGet(out Transaction ambientTransaction))
             {
                 Transaction = new NonDurableTransaction();
                 ownsTransaction = true;
                 enlistedTransaction = true;
-                enlistmentNotification = new EnlistmentNotification2(Transaction);
+                enlistmentNotification = new EnlistmentNotification(Transaction);
                 ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
                 return new ValueTask<bool>(true);
             }
@@ -68,11 +68,11 @@ namespace NServiceBus
         bool ownsTransaction;
         bool enlistedTransaction;
 
-        internal class EnlistmentNotification2 : IEnlistmentNotification
+        internal class EnlistmentNotification : IEnlistmentNotification
         {
             public TaskCompletionSource TransactionCompletionSource { get; private set; } = new TaskCompletionSource();
 
-            public EnlistmentNotification2(NonDurableTransaction transaction) => this.transaction = transaction;
+            public EnlistmentNotification(NonDurableTransaction transaction) => this.transaction = transaction;
 
             public void Prepare(PreparingEnlistment preparingEnlistment)
             {

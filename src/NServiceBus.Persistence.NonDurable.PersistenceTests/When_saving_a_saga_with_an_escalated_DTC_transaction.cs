@@ -18,7 +18,7 @@
             // This enlistment notifier emulates a participating DTC transaction that fails to commit.
             var enlistmentNotifier = new EnlistmentNotifier(abortTransaction: true);
             Transaction transaction = null;
-            NonDurableSynchronizedStorageSession.EnlistmentNotification2 enlistmentNotification = null;
+            NonDurableSynchronizedStorageSession.EnlistmentNotification enlistmentNotification = null;
 
             var newSagaData = new TestSagaData()
             {
