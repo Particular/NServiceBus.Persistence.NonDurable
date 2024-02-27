@@ -19,8 +19,4 @@
     <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="9.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="../NServiceBus.AcceptanceTests/**/*.cs" Exclude="../NServiceBus.AcceptanceTests/obj/**/*.*" />
-  </ItemGroup>
-
 </Project>

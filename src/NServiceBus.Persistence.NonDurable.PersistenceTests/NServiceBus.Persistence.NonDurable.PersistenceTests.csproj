@@ -21,8 +21,4 @@
     <PackageReference Include="NServiceBus.PersistenceTests.Sources" Version="9.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="../NServiceBus.PersistenceTesting/**/*.cs" Exclude="../NServiceBus.PersistenceTesting/obj/**/*.*" />
-  </ItemGroup>
-
 </Project>
