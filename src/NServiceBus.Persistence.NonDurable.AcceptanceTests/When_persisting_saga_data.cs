@@ -112,17 +112,17 @@
             }
         };
 
-        static ICollection<string> Collection = new HashSet<string>
-        {
+        static ICollection<string> Collection =
+        [
             "1",
             "2"
-        };
+        ];
 
-        static IList<string> List = new List<string>
-        {
+        static IList<string> List =
+        [
             "1",
             "2"
-        };
+        ];
 
         static IReadOnlyDictionary<string, int> ReadOnlyDictionary = new ReadOnlyDictionary<string, int>(new Dictionary<string, int>
         {

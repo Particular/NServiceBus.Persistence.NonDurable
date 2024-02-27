@@ -21,7 +21,8 @@ namespace NServiceBus.Persistence.NonDurable
         /// </param>
         public static OutboxSettings TimeToKeepDeduplicationData(this OutboxSettings settings, TimeSpan time)
         {
-            Guard.AgainstNegativeAndZero(nameof(time), time);
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(time, TimeSpan.Zero);
+
             settings.GetSettings().Set(NonDurableOutboxPersistence.TimeToKeepDeduplicationEntries, time);
             return settings;
         }
