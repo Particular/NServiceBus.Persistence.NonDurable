@@ -16,11 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="9.0.0-alpha.8" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="../NServiceBus.AcceptanceTests/**/*.cs" Exclude="../NServiceBus.AcceptanceTests/obj/**/*.*" />
+    <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="9.0.0" />
   </ItemGroup>
 
 </Project>
