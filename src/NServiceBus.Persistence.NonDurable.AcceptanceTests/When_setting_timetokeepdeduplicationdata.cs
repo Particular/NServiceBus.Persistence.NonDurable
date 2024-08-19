@@ -34,7 +34,7 @@
                 .Run();
 
             Assert.IsTrue(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), "Either copy 1 or 2 should be processed");
-            Assert.IsFalse(context.ProcessedIds.ContainsKey("1") && context.ProcessedIds.ContainsKey("2"), "Copy 1 and 2 should not both be processed");
+            Assert.That(context.ProcessedIds.ContainsKey("1") && context.ProcessedIds.ContainsKey("2"), Is.False, "Copy 1 and 2 should not both be processed");
             Assert.IsTrue(context.ProcessedIds.ContainsKey("3"), "Copy 3 should be processed because it is sent after the expiration period");
         }
 
