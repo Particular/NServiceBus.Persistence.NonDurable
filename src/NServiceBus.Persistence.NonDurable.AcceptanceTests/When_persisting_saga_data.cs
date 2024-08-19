@@ -25,11 +25,11 @@
 
             Assert.That(context.LoadedSagaData, Is.Not.Null);
 
-            CollectionAssert.AreEquivalent(StringArray, context.LoadedSagaData.StringArray);
+            Assert.That(context.LoadedSagaData.StringArray, Is.EquivalentTo(StringArray));
 
-            CollectionAssert.AreEquivalent(Collection, context.LoadedSagaData.Collection);
+            Assert.That(context.LoadedSagaData.Collection, Is.EquivalentTo(Collection));
 
-            CollectionAssert.AreEquivalent(List, context.LoadedSagaData.List);
+            Assert.That(context.LoadedSagaData.List, Is.EquivalentTo(List));
 
             Assert.That(context.LoadedSagaData.IntStringDictionary, Has.Count.EqualTo(2));
             Assert.Multiple(() =>
