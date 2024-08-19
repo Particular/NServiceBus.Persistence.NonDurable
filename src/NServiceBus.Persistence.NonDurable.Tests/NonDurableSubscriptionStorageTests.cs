@@ -22,7 +22,7 @@
                 new MessageType("SomeMessage", "2.0.0")
             }, new ContextBag());
 
-            Assert.AreEqual("subscriberA", subscribers.Single().Endpoint);
+            Assert.That(subscribers.Single().Endpoint, Is.EqualTo("subscriberA"));
         }
     }
 }
