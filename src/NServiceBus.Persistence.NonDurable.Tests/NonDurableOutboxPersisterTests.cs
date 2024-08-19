@@ -29,7 +29,7 @@
 
             var message = await storage.Get(messageId, new ContextBag());
 
-            Assert.False(message.TransportOperations.Any());
+            Assert.That(message.TransportOperations.Any(), Is.False);
         }
 
         [Test]
