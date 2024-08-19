@@ -25,8 +25,11 @@
                 await persister.Get<TestSagaData>(saga.Id, new NonDurableSynchronizedStorageSession(), new ContextBag());
             var returnedSaga2 = await persister.Get<TestSagaData>("Id", saga.Id,
                 new NonDurableSynchronizedStorageSession(), new ContextBag());
-            Assert.That(returnedSaga1, Is.Not.SameAs(returnedSaga2));
-            Assert.That(saga, Is.Not.SameAs(returnedSaga1));
+            Assert.Multiple(() =>
+            {
+                Assert.That(returnedSaga1, Is.Not.SameAs(returnedSaga2));
+                Assert.That(saga, Is.Not.SameAs(returnedSaga1));
+            });
             Assert.That(saga, Is.Not.SameAs(returnedSaga2));
         }
 

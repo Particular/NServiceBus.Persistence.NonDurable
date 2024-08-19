@@ -52,9 +52,12 @@
             var unchangedSagaData = await GetById<TestSagaData>(startingSagaData.Id);
 
             Assert.That(unchangedSagaData, Is.Not.Null);
-            Assert.That(unchangedSagaData.Id, Is.EqualTo(startingSagaData.Id));
-            Assert.That(unchangedSagaData.SomeId, Is.EqualTo(startingSagaData.SomeId));
-            Assert.That(unchangedSagaData.LastUpdatedBy, Is.EqualTo(startingSagaData.LastUpdatedBy));
+            Assert.Multiple(() =>
+            {
+                Assert.That(unchangedSagaData.Id, Is.EqualTo(startingSagaData.Id));
+                Assert.That(unchangedSagaData.SomeId, Is.EqualTo(startingSagaData.SomeId));
+                Assert.That(unchangedSagaData.LastUpdatedBy, Is.EqualTo(startingSagaData.LastUpdatedBy));
+            });
         }
 
         public class TestSaga : Saga<TestSagaData>, IAmStartedByMessages<StartMessage>
