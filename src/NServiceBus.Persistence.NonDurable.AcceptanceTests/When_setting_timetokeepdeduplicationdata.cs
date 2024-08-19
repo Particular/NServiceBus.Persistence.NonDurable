@@ -33,9 +33,9 @@
                 .Done(c => (c.ProcessedIds.TryGetValue("1", out _) || c.ProcessedIds.TryGetValue("2", out _)) && c.ProcessedIds.TryGetValue("3", out _))
                 .Run();
 
-            Assert.IsTrue(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), "Either copy 1 or 2 should be processed");
+            Assert.That(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), Is.True, "Either copy 1 or 2 should be processed");
             Assert.That(context.ProcessedIds.ContainsKey("1") && context.ProcessedIds.ContainsKey("2"), Is.False, "Copy 1 and 2 should not both be processed");
-            Assert.IsTrue(context.ProcessedIds.ContainsKey("3"), "Copy 3 should be processed because it is sent after the expiration period");
+            Assert.That(context.ProcessedIds.ContainsKey("3"), Is.True, "Copy 3 should be processed because it is sent after the expiration period");
         }
 
         /// <summary>
