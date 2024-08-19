@@ -31,27 +31,27 @@
 
             CollectionAssert.AreEquivalent(List, context.LoadedSagaData.List);
 
-            Assert.That(context.LoadedSagaData.IntStringDictionary.Count, Is.EqualTo(2));
+            Assert.That(context.LoadedSagaData.IntStringDictionary, Has.Count.EqualTo(2));
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.IntStringDictionary[1], Is.EqualTo(IntStringDictionary[1]));
                 Assert.That(context.LoadedSagaData.IntStringDictionary[2], Is.EqualTo(IntStringDictionary[2]));
 
-                Assert.That(context.LoadedSagaData.IntStringIDictionary.Count, Is.EqualTo(2));
+                Assert.That(context.LoadedSagaData.IntStringIDictionary, Has.Count.EqualTo(2));
             });
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.IntStringIDictionary[1], Is.EqualTo(IntStringIDictionary[1]));
                 Assert.That(context.LoadedSagaData.IntStringIDictionary[2], Is.EqualTo(IntStringIDictionary[2]));
 
-                Assert.That(context.LoadedSagaData.StringStringDictionary.Count, Is.EqualTo(2));
+                Assert.That(context.LoadedSagaData.StringStringDictionary, Has.Count.EqualTo(2));
             });
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.StringStringDictionary["1"], Is.EqualTo(StringStringDictionary["1"]));
                 Assert.That(context.LoadedSagaData.StringStringDictionary["2"], Is.EqualTo(StringStringDictionary["2"]));
 
-                Assert.That(context.LoadedSagaData.StringObjectDictionary.Count, Is.EqualTo(2));
+                Assert.That(context.LoadedSagaData.StringObjectDictionary, Has.Count.EqualTo(2));
             });
             Assert.Multiple(() =>
             {
@@ -62,7 +62,7 @@
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].Int, Is.EqualTo(StringObjectDictionary["obj2"].Int));
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].String, Is.EqualTo(StringObjectDictionary["obj2"].String));
 
-                Assert.That(context.LoadedSagaData.ReadOnlyDictionary.Count, Is.EqualTo(2));
+                Assert.That(context.LoadedSagaData.ReadOnlyDictionary, Has.Count.EqualTo(2));
             });
             Assert.Multiple(() =>
             {
