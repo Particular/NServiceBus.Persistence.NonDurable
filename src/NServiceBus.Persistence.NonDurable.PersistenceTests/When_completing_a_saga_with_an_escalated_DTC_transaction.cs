@@ -51,7 +51,7 @@
 
             var unchangedSagaData = await GetById<TestSagaData>(startingSagaData.Id);
 
-            Assert.NotNull(unchangedSagaData);
+            Assert.That(unchangedSagaData, Is.Not.Null);
             Assert.That(unchangedSagaData.Id, Is.EqualTo(startingSagaData.Id));
             Assert.That(unchangedSagaData.SomeId, Is.EqualTo(startingSagaData.SomeId));
             Assert.That(unchangedSagaData.LastUpdatedBy, Is.EqualTo(startingSagaData.LastUpdatedBy));

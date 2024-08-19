@@ -23,7 +23,7 @@
                 .Done(c => c.SagaDataLoaded)
                 .Run();
 
-            Assert.NotNull(context.LoadedSagaData);
+            Assert.That(context.LoadedSagaData, Is.Not.Null);
 
             CollectionAssert.AreEquivalent(StringArray, context.LoadedSagaData.StringArray);
 

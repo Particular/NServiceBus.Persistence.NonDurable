@@ -51,7 +51,7 @@
             storage.RemoveEntriesOlderThan(DateTime.UtcNow);
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.NotNull(message);
+            Assert.That(message, Is.Not.Null);
         }
 
         [Test]
@@ -79,7 +79,7 @@
             storage.RemoveEntriesOlderThan(beforeStore);
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.NotNull(message);
+            Assert.That(message, Is.Not.Null);
 
             storage.RemoveEntriesOlderThan(afterStore);
 
@@ -124,7 +124,7 @@
             }
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.NotNull(message);
+            Assert.That(message, Is.Not.Null);
         }
     }
 }
