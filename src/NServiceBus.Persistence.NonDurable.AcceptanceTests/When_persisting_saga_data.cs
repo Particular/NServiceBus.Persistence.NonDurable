@@ -25,34 +25,28 @@
 
             Assert.That(context.LoadedSagaData, Is.Not.Null);
 
-            Assert.That(context.LoadedSagaData.StringArray, Is.EquivalentTo(StringArray));
-
-            Assert.That(context.LoadedSagaData.Collection, Is.EquivalentTo(Collection));
-
-            Assert.That(context.LoadedSagaData.List, Is.EquivalentTo(List));
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.LoadedSagaData.StringArray, Is.EquivalentTo(StringArray));
+                Assert.That(context.LoadedSagaData.Collection, Is.EquivalentTo(Collection));
+                Assert.That(context.LoadedSagaData.List, Is.EquivalentTo(List));
+            });
 
             Assert.That(context.LoadedSagaData.IntStringDictionary, Has.Count.EqualTo(2));
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.IntStringDictionary[1], Is.EqualTo(IntStringDictionary[1]));
                 Assert.That(context.LoadedSagaData.IntStringDictionary[2], Is.EqualTo(IntStringDictionary[2]));
-
-                Assert.That(context.LoadedSagaData.IntStringIDictionary, Has.Count.EqualTo(2));
             });
-            Assert.Multiple(() =>
-            {
-                Assert.That(context.LoadedSagaData.IntStringIDictionary[1], Is.EqualTo(IntStringIDictionary[1]));
-                Assert.That(context.LoadedSagaData.IntStringIDictionary[2], Is.EqualTo(IntStringIDictionary[2]));
 
-                Assert.That(context.LoadedSagaData.StringStringDictionary, Has.Count.EqualTo(2));
-            });
+            Assert.That(context.LoadedSagaData.StringStringDictionary, Has.Count.EqualTo(2));
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.StringStringDictionary["1"], Is.EqualTo(StringStringDictionary["1"]));
                 Assert.That(context.LoadedSagaData.StringStringDictionary["2"], Is.EqualTo(StringStringDictionary["2"]));
-
-                Assert.That(context.LoadedSagaData.StringObjectDictionary, Has.Count.EqualTo(2));
             });
+
+            Assert.That(context.LoadedSagaData.StringObjectDictionary, Has.Count.EqualTo(2));
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj1"].Guid, Is.EqualTo(StringObjectDictionary["obj1"].Guid));
@@ -61,34 +55,36 @@
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].Guid, Is.EqualTo(StringObjectDictionary["obj2"].Guid));
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].Int, Is.EqualTo(StringObjectDictionary["obj2"].Int));
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].String, Is.EqualTo(StringObjectDictionary["obj2"].String));
-
-                Assert.That(context.LoadedSagaData.ReadOnlyDictionary, Has.Count.EqualTo(2));
             });
+
+            Assert.That(context.LoadedSagaData.ReadOnlyDictionary, Has.Count.EqualTo(2));
             Assert.Multiple(() =>
             {
                 Assert.That(context.LoadedSagaData.ReadOnlyDictionary["hello"], Is.EqualTo(ReadOnlyDictionary["hello"]));
                 Assert.That(context.LoadedSagaData.ReadOnlyDictionary["world"], Is.EqualTo(ReadOnlyDictionary["world"]));
+            });
 
+            Assert.Multiple(() =>
+            {
                 Assert.That(context.LoadedSagaData.DateTimeLocal, Is.EqualTo(DateTimeLocal));
-            });
-            Assert.Multiple(() =>
-            {
                 Assert.That(context.LoadedSagaData.DateTimeLocal.Kind, Is.EqualTo(DateTimeLocal.Kind));
-                Assert.That(context.LoadedSagaData.DateTimeUnspecified, Is.EqualTo(DateTimeUnspecified));
             });
-            Assert.Multiple(() =>
-            {
-                Assert.That(context.LoadedSagaData.DateTimeUnspecified.Kind, Is.EqualTo(DateTimeUnspecified.Kind));
-                Assert.That(context.LoadedSagaData.DateTimeUtc, Is.EqualTo(DateTimeUtc));
-            });
-            Assert.Multiple(() =>
-            {
-                Assert.That(context.LoadedSagaData.DateTimeUtc.Kind, Is.EqualTo(DateTimeUtc.Kind));
 
-                Assert.That(context.LoadedSagaData.DateTimeOffset, Is.EqualTo(DateTimeOffset));
-            });
             Assert.Multiple(() =>
             {
+                Assert.That(context.LoadedSagaData.DateTimeUnspecified, Is.EqualTo(DateTimeUnspecified));
+                Assert.That(context.LoadedSagaData.DateTimeUnspecified.Kind, Is.EqualTo(DateTimeUnspecified.Kind));
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.LoadedSagaData.DateTimeUtc, Is.EqualTo(DateTimeUtc));
+                Assert.That(context.LoadedSagaData.DateTimeUtc.Kind, Is.EqualTo(DateTimeUtc.Kind));
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.LoadedSagaData.DateTimeOffset, Is.EqualTo(DateTimeOffset));
                 Assert.That(context.LoadedSagaData.DateTimeOffset.Offset, Is.EqualTo(DateTimeOffset.Offset));
                 Assert.That(context.LoadedSagaData.DateTimeOffset.LocalDateTime, Is.EqualTo(DateTimeOffset.LocalDateTime));
             });
