@@ -13,6 +13,13 @@
 
         public void Dispose() => Transaction = null;
 
+        public ValueTask DisposeAsync()
+        {
+            Transaction = null;
+
+            return ValueTask.CompletedTask;
+        }
+
         public Task Commit(CancellationToken cancellationToken = default)
         {
             Transaction.Commit();
