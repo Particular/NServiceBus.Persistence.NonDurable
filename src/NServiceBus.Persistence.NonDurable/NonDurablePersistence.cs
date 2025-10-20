@@ -6,13 +6,15 @@
     /// <summary>
     /// Used to enable NonDurable persistence.
     /// </summary>
-    public class NonDurablePersistence : PersistenceDefinition
+    public class NonDurablePersistence : PersistenceDefinition, IPersistenceDefinitionFactory<NonDurablePersistence>
     {
-        internal NonDurablePersistence()
+        NonDurablePersistence()
         {
-            Supports<StorageType.Sagas>(s => s.EnableFeatureByDefault<NonDurableSagaPersistence>());
-            Supports<StorageType.Subscriptions>(s => s.EnableFeatureByDefault<NonDurableSubscriptionPersistence>());
-            Supports<StorageType.Outbox>(s => s.EnableFeatureByDefault<NonDurableOutboxPersistence>());
+            Supports<StorageType.Sagas, NonDurableSagaPersistence>();
+            Supports<StorageType.Subscriptions, NonDurableSubscriptionPersistence>();
+            Supports<StorageType.Outbox, NonDurableOutboxPersistence>();
         }
+
+        static NonDurablePersistence IPersistenceDefinitionFactory<NonDurablePersistence>.Create() => new();
     }
 }
