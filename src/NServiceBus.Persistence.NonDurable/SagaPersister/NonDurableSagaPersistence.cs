@@ -7,8 +7,7 @@
     {
         public NonDurableSagaPersistence()
         {
-            Defaults(s => s.EnableFeatureByDefault<NonDurableTransactionalStorageFeature>());
-
+            EnableByDefault<NonDurableTransactionalStorageFeature>();
             DependsOn<Sagas>();
             DependsOn<NonDurableTransactionalStorageFeature>();
         }
