@@ -10,8 +10,7 @@
     {
         public NonDurableOutboxPersistence()
         {
-            Defaults(s => s.EnableFeatureByDefault<NonDurableTransactionalStorageFeature>());
-
+            EnableByDefault<NonDurableTransactionalStorageFeature>();
             DependsOn<Outbox>();
             DependsOn<NonDurableTransactionalStorageFeature>();
         }
