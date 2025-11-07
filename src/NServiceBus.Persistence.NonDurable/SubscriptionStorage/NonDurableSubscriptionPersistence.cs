@@ -3,16 +3,10 @@
     using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
     using Microsoft.Extensions.DependencyInjection;
 
-    class NonDurableSubscriptionPersistence : Feature
+    sealed class NonDurableSubscriptionPersistence : Feature
     {
-        public NonDurableSubscriptionPersistence()
-        {
-            DependsOn("NServiceBus.Features.MessageDrivenSubscriptions");
-        }
+        public NonDurableSubscriptionPersistence() => DependsOn("NServiceBus.Features.MessageDrivenSubscriptions");
 
-        protected override void Setup(FeatureConfigurationContext context)
-        {
-            context.Services.AddSingleton<ISubscriptionStorage, NonDurableSubscriptionStorage>();
-        }
+        protected override void Setup(FeatureConfigurationContext context) => context.Services.AddSingleton<ISubscriptionStorage, NonDurableSubscriptionStorage>();
     }
 }
