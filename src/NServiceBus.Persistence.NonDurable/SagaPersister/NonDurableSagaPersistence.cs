@@ -3,11 +3,12 @@
     using NServiceBus.Sagas;
     using Microsoft.Extensions.DependencyInjection;
 
-    class NonDurableSagaPersistence : Feature
+    sealed class NonDurableSagaPersistence : Feature
     {
         public NonDurableSagaPersistence()
         {
-            EnableByDefault<NonDurableTransactionalStorageFeature>();
+            Enable<NonDurableTransactionalStorageFeature>();
+
             DependsOn<Sagas>();
             DependsOn<NonDurableTransactionalStorageFeature>();
         }
