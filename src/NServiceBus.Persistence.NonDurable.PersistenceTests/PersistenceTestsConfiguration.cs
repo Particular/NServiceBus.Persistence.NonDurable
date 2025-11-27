@@ -36,10 +36,6 @@
             return Task.CompletedTask;
         }
 
-        public Task Cleanup(CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
+        public Task Cleanup(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
