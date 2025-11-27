@@ -15,7 +15,11 @@
         {
             configuration.RequiresDtcSupport();
 
-            var startingSagaData = new TestSagaData { SomeId = Guid.NewGuid().ToString(), LastUpdatedBy = "Unchanged" };
+            var startingSagaData = new TestSagaData
+            {
+                SomeId = Guid.NewGuid().ToString(),
+                LastUpdatedBy = "Unchanged"
+            };
             await SaveSaga(startingSagaData);
 
             // This enlistment notifier emulates a participating DTC transaction that fails to commit.
@@ -62,15 +66,9 @@
 
         public class TestSaga : Saga<TestSagaData>, IAmStartedByMessages<StartMessage>
         {
-            public Task Handle(StartMessage message, IMessageHandlerContext context)
-            {
-                throw new NotImplementedException();
-            }
+            public Task Handle(StartMessage message, IMessageHandlerContext context) => throw new NotImplementedException();
 
-            protected override void ConfigureHowToFindSaga(SagaPropertyMapper<TestSagaData> mapper)
-            {
-                mapper.ConfigureMapping<StartMessage>(msg => msg.SomeId).ToSaga(saga => saga.SomeId);
-            }
+            protected override void ConfigureHowToFindSaga(SagaPropertyMapper<TestSagaData> mapper) => mapper.MapSaga(s => s.SomeId).ToMessage<StartMessage>(msg => msg.SomeId);
         }
 
         public class TestSagaData : ContainSagaData
