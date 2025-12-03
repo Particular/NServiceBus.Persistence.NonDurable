@@ -1,22 +1,21 @@
-namespace NServiceBus.Persistence.NonDurable.Tests
+namespace NServiceBus.Persistence.NonDurable.Tests;
+
+using Sagas;
+
+class SagaMetadataHelper
 {
-    using NServiceBus.Sagas;
-
-    class SagaMetadataHelper
+    public static SagaCorrelationProperty GetMetadata<TSaga>(IContainSagaData entity) where TSaga : Saga
     {
-        public static SagaCorrelationProperty GetMetadata<T>(IContainSagaData entity)
+        var metadata = SagaMetadata.Create<TSaga>();
+
+        if (!metadata.TryGetCorrelationProperty(out var correlatedProp))
         {
-            var metadata = SagaMetadata.Create(typeof(T));
-
-            if (!metadata.TryGetCorrelationProperty(out var correlatedProp))
-            {
-                return SagaCorrelationProperty.None;
-            }
-            var prop = entity.GetType().GetProperty(correlatedProp.Name);
-
-            var value = prop.GetValue(entity);
-
-            return new SagaCorrelationProperty(correlatedProp.Name, value);
+            return SagaCorrelationProperty.None;
         }
+        var prop = entity.GetType().GetProperty(correlatedProp.Name);
+
+        var value = prop.GetValue(entity);
+
+        return new SagaCorrelationProperty(correlatedProp.Name, value);
     }
 }
