@@ -51,7 +51,7 @@
 
             var notFoundSagaData = await GetById<TestSagaData>(newSagaData.Id);
 
-            Assert.IsNull(notFoundSagaData);
+            Assert.That(notFoundSagaData, Is.Null);
         }
 
         public class TestSaga : Saga<TestSagaData>, IAmStartedByMessages<StartMessage>

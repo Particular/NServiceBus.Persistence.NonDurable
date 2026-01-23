@@ -29,7 +29,7 @@
 
             var message = await storage.Get(messageId, new ContextBag());
 
-            Assert.False(message.TransportOperations.Any());
+            Assert.That(message.TransportOperations.Any(), Is.False);
         }
 
         [Test]
@@ -51,7 +51,7 @@
             storage.RemoveEntriesOlderThan(DateTime.UtcNow);
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.NotNull(message);
+            Assert.That(message, Is.Not.Null);
         }
 
         [Test]
@@ -79,12 +79,12 @@
             storage.RemoveEntriesOlderThan(beforeStore);
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.NotNull(message);
+            Assert.That(message, Is.Not.Null);
 
             storage.RemoveEntriesOlderThan(afterStore);
 
             message = await storage.Get(messageId, new ContextBag());
-            Assert.Null(message);
+            Assert.That(message, Is.Null);
         }
 
         [Test]
@@ -104,7 +104,7 @@
             }
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.Null(message);
+            Assert.That(message, Is.Null);
         }
 
         [Test]
@@ -124,7 +124,7 @@
             }
 
             var message = await storage.Get(messageId, new ContextBag());
-            Assert.NotNull(message);
+            Assert.That(message, Is.Not.Null);
         }
     }
 }
