@@ -5,10 +5,16 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 static class NonDurableStorageRuntime
 {
-    public const string StorageKey = "NonDurablePersistence.Storage";
-
     public static NonDurableStorage SharedStorage { get; } = new();
 
-    public static void Configure(IServiceCollection services, NonDurableStorage? configuredStorage)
-        => services.TryAddSingleton(configuredStorage ?? SharedStorage);
+    public static void Configure(IServiceCollection services, NonDurablePersistenceOptions? persistenceOptions = null)
+    {
+        var storage = persistenceOptions?.Storage
+            ?? (persistenceOptions?.TimeProvider is not null
+                ? new NonDurableStorage(new NonDurableStorageOptions { TimeProvider = persistenceOptions.TimeProvider })
+                : null)
+            ?? SharedStorage;
+
+        services.TryAddSingleton(storage);
+    }
 }

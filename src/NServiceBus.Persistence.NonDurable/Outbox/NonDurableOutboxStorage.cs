@@ -15,6 +15,8 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
     {
     }
 
+    internal NonDurableStorage StorageRuntime => storage;
+
     public Task<OutboxMessage> Get(string messageId, ContextBag context, CancellationToken cancellationToken = default)
     {
         using var activity = NonDurablePersistenceTracing.StartOutboxGet(messageId);
@@ -44,11 +46,12 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
         using var activity = NonDurablePersistenceTracing.StartOutboxStore(message.MessageId, message.TransportOperations.Length);
         var storageKey = OutboxStorageKey(message.MessageId);
         var tx = (NonDurableOutboxTransaction)transaction;
+        var storedAt = storage.TimeProvider.GetUtcNow().UtcDateTime;
         tx.Enlist(
-            new StoreOperationState(Storage, storageKey, message.MessageId, message.TransportOperations.Select(CopyOperation).ToArray()),
+            new StoreOperationState(Storage, storageKey, message.MessageId, message.TransportOperations.Select(CopyOperation).ToArray(), storedAt),
             static state =>
             {
-                if (!state.Storage.TryAdd(state.StorageKey, new StoredOutboxMessage(state.MessageId, state.TransportOperations)))
+                if (!state.Storage.TryAdd(state.StorageKey, new StoredOutboxMessage(state.MessageId, state.TransportOperations) { StoredAt = state.StoredAt }))
                 {
                     throw new Exception($"Outbox message with id '{state.MessageId}' is already present in storage.");
                 }
@@ -71,7 +74,7 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
             return Task.CompletedTask;
         }
 
-        storedMessage.MarkAsDispatched(DateTime.UtcNow);
+        storedMessage.MarkAsDispatched(storage.TimeProvider.GetUtcNow().UtcDateTime);
         NonDurablePersistenceTracing.AddHitEvent(activity);
         NonDurablePersistenceTracing.AddMarkedDispatchedEvent(activity);
         NonDurablePersistenceTracing.MarkSuccess(activity);
@@ -98,7 +101,8 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
         ConcurrentDictionary<string, StoredOutboxMessage> Storage,
         string StorageKey,
         string MessageId,
-        TransportOperation[] TransportOperations);
+        TransportOperation[] TransportOperations,
+        DateTime StoredAt);
 
     static TransportOperation CopyOperation(TransportOperation operation)
     {

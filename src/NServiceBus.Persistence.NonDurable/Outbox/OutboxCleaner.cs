@@ -65,7 +65,8 @@ class OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplic
     {
         try
         {
-            storage.RemoveEntriesOlderThan(DateTime.UtcNow - timeToKeepDeduplicationData);
+            var timeProvider = storage.StorageRuntime.TimeProvider;
+            storage.RemoveEntriesOlderThan(timeProvider.GetUtcNow().UtcDateTime - timeToKeepDeduplicationData);
         }
         catch
         {

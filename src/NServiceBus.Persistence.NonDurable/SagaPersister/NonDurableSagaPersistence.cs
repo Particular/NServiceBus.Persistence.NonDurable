@@ -16,8 +16,8 @@ sealed class NonDurableSagaPersistence : Feature
 
     protected override void Setup(FeatureConfigurationContext context)
     {
-        var configuredStorage = context.Settings.GetOrDefault<NonDurableStorage>(NonDurableStorageRuntime.StorageKey);
-        NonDurableStorageRuntime.Configure(context.Services, configuredStorage);
+        var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
+        NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
 
         var serializerOptions = context.Settings.GetOrDefault<System.Text.Json.JsonSerializerOptions>(SerializerOptionsKey)
             ?? new System.Text.Json.JsonSerializerOptions

@@ -13,7 +13,7 @@ public class When_registering_nondurable_storage
         var serviceProviderStorage = new NonDurableStorage();
         serviceCollection.AddSingleton(serviceProviderStorage);
 
-        NonDurableStorageRuntime.Configure(serviceCollection, configuredStorage: new NonDurableStorage());
+        NonDurableStorageRuntime.Configure(serviceCollection, new NonDurablePersistenceOptions { Storage = new NonDurableStorage() });
 
         using var provider = serviceCollection.BuildServiceProvider();
 
@@ -22,14 +22,14 @@ public class When_registering_nondurable_storage
         var configuredServices = new ServiceCollection();
         var configuredStorage = new NonDurableStorage();
 
-        NonDurableStorageRuntime.Configure(configuredServices, configuredStorage);
+        NonDurableStorageRuntime.Configure(configuredServices, new NonDurablePersistenceOptions { Storage = configuredStorage });
 
         using var configuredProvider = configuredServices.BuildServiceProvider();
         Assert.That(configuredProvider.GetRequiredService<NonDurableStorage>(), Is.SameAs(configuredStorage));
 
         var defaultServices = new ServiceCollection();
 
-        NonDurableStorageRuntime.Configure(defaultServices, configuredStorage: null);
+        NonDurableStorageRuntime.Configure(defaultServices, persistenceOptions: null);
 
         using var defaultProvider = defaultServices.BuildServiceProvider();
         Assert.That(defaultProvider.GetRequiredService<NonDurableStorage>(), Is.SameAs(NonDurableStorageRuntime.SharedStorage));
