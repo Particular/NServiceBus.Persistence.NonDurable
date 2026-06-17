@@ -3,11 +3,26 @@
 namespace NServiceBus
 {
     public class NonDurablePersistence : NServiceBus.Persistence.PersistenceDefinition, NServiceBus.Persistence.IPersistenceDefinitionFactory<NServiceBus.NonDurablePersistence> { }
+    public static class NonDurablePersistenceConfigurationExtensions
+    {
+        public static void SerializerOptions(this NServiceBus.PersistenceExtensions<NServiceBus.NonDurablePersistence> persistenceExtensions, System.Text.Json.JsonSerializerOptions options) { }
+        public static void Storage(this NServiceBus.PersistenceExtensions<NServiceBus.NonDurablePersistence> persistenceExtensions, NServiceBus.NonDurableStorage storage) { }
+        public static NServiceBus.PersistenceExtensions<NServiceBus.NonDurablePersistence> UseNonDurablePersistence(this NServiceBus.EndpointConfiguration configuration) { }
+    }
+    public class NonDurableStorage
+    {
+        public NonDurableStorage() { }
+    }
 }
 namespace NServiceBus.Persistence.NonDurable
 {
     public static class NonDurableOutboxSettingsExtensions
     {
         public static NServiceBus.Outbox.OutboxSettings TimeToKeepDeduplicationData(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
+    }
+    public class NonDurableSagaPersisterSettings
+    {
+        public NonDurableSagaPersisterSettings(System.Text.Json.JsonSerializerOptions serializerOptions) { }
+        public System.Text.Json.JsonSerializerOptions SerializerOptions { get; }
     }
 }

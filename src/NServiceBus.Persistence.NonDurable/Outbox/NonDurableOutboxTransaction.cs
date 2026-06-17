@@ -1,31 +1,47 @@
-﻿namespace NServiceBus
+namespace NServiceBus.Persistence.NonDurable;
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Outbox;
+
+class NonDurableOutboxTransaction : IOutboxTransaction
 {
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Outbox;
+    public NonDurableStorageTransaction? Transaction { get; private set; } = new();
 
-    class NonDurableOutboxTransaction : IOutboxTransaction
+    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null)
     {
-        public NonDurableOutboxTransaction() => Transaction = new NonDurableTransaction();
+        ArgumentNullException.ThrowIfNull(apply);
+        ArgumentNullException.ThrowIfNull(Transaction);
 
-        public NonDurableTransaction Transaction { get; private set; }
+        Transaction.Enlist(state, apply, rollback);
+    }
 
-        public void Dispose() => Transaction = null;
+    public Task Commit(CancellationToken cancellationToken = default)
+    {
+        Transaction?.Commit();
+        return Task.CompletedTask;
+    }
 
-        public ValueTask DisposeAsync()
+    public void Dispose()
+    {
+        if (Transaction is null)
         {
-            Transaction = null;
-
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        public Task Commit(CancellationToken cancellationToken = default)
+        Transaction = null;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (Transaction is null)
         {
-            Transaction.Commit();
-            return Task.CompletedTask;
+            return default;
         }
 
-        public void Enlist(Action action) => Transaction.Enlist(action);
+        Transaction = null;
+
+        return default;
     }
 }

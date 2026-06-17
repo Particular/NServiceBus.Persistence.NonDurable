@@ -68,7 +68,7 @@
             Assert.That(async () => await losingSaveSession.CompleteAsync(),
                 Throws.InstanceOf<Exception>().And.Message
                     .StartsWith(
-                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] already saved."));
+                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] was modified by another process."));
         }
 
         [Test]
@@ -106,7 +106,7 @@
             Assert.That(async () => await losingSaveSession.CompleteAsync(),
                 Throws.InstanceOf<Exception>().And.Message
                     .StartsWith(
-                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] already saved."));
+                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] was modified by another process."));
         }
 
         [Test]
@@ -139,7 +139,7 @@
             Assert.That(async () => await losingSaveSession.CompleteAsync(),
                 Throws.InstanceOf<Exception>().And.Message
                     .StartsWith(
-                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] already saved."));
+                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] was modified by another process."));
         }
 
         [Test]
@@ -177,7 +177,7 @@
             Assert.That(async () => await losingSaveSession.CompleteAsync(),
                 Throws.InstanceOf<Exception>().And.Message
                     .StartsWith(
-                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] already saved."));
+                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] was modified by another process."));
 
             losingSessionContext = new ContextBag();
             var returnedSaga3 = await Task.Run(() => persister.Get<TestSagaData>("SomeId", sagaId.ToString(),
@@ -200,7 +200,7 @@
             Assert.That(async () => await losingSaveSession.CompleteAsync(),
                 Throws.InstanceOf<Exception>().And.Message
                     .StartsWith(
-                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] already saved."));
+                        $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] was modified by another process."));
         }
     }
 }

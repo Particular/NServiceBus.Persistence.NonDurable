@@ -1,19 +1,37 @@
-﻿namespace NServiceBus.Features
+namespace NServiceBus.Features;
+
+using Microsoft.Extensions.DependencyInjection;
+using NServiceBus.Persistence.NonDurable;
+using NServiceBus.Sagas;
+
+sealed class NonDurableSagaPersistence : Feature
 {
-    using NServiceBus.Sagas;
-    using Microsoft.Extensions.DependencyInjection;
-
-    sealed class NonDurableSagaPersistence : Feature
+    public NonDurableSagaPersistence()
     {
-        public NonDurableSagaPersistence()
-        {
-            Enable<NonDurableTransactionalStorageFeature>();
+        DependsOn<Sagas>();
+        DependsOn<NonDurableTransactionalStorageFeature>();
 
-            DependsOn<Sagas>();
-            DependsOn<NonDurableTransactionalStorageFeature>();
-        }
-
-        protected override void Setup(FeatureConfigurationContext context) =>
-            context.Services.AddSingleton<ISagaPersister, NonDurableSagaPersister>();
+        Enable<NonDurableTransactionalStorageFeature>();
     }
+
+    protected override void Setup(FeatureConfigurationContext context)
+    {
+        var configuredStorage = context.Settings.GetOrDefault<NonDurableStorage>(NonDurableStorageRuntime.StorageKey);
+        NonDurableStorageRuntime.Configure(context.Services, configuredStorage);
+
+        var serializerOptions = context.Settings.GetOrDefault<System.Text.Json.JsonSerializerOptions>(SerializerOptionsKey)
+            ?? new System.Text.Json.JsonSerializerOptions
+            {
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+            };
+
+        context.Services.AddSingleton(new NonDurableSagaPersisterSettings(serializerOptions));
+        context.Services.AddSingleton(sp =>
+            new NonDurableSagaPersister(
+                sp.GetRequiredService<NonDurableStorage>(),
+                sp.GetRequiredService<NonDurableSagaPersisterSettings>()));
+        context.Services.AddSingleton<ISagaPersister>(sp => sp.GetRequiredService<NonDurableSagaPersister>());
+    }
+
+    internal static readonly string SerializerOptionsKey = "NonDurableSagaPersistence.SerializerOptions";
 }

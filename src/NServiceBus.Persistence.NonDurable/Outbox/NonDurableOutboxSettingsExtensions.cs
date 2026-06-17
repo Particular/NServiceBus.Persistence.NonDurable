@@ -2,7 +2,6 @@ namespace NServiceBus.Persistence.NonDurable
 {
     using System;
     using Configuration.AdvancedExtensibility;
-    using Features;
     using Outbox;
 
     /// <summary>
@@ -23,7 +22,7 @@ namespace NServiceBus.Persistence.NonDurable
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(time, TimeSpan.Zero);
 
-            settings.GetSettings().Set(NonDurableOutboxPersistence.TimeToKeepDeduplicationEntries, time);
+            settings.GetSettings().Set("Outbox.TimeToKeepDeduplicationEntries", time);
             return settings;
         }
     }

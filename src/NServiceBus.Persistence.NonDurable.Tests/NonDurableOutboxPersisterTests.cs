@@ -13,7 +13,7 @@
         [Test]
         public async Task Should_clear_operations_on_dispatched_messages()
         {
-            var storage = new NonDurableOutboxStorage();
+            var storage = new NonDurableOutboxStorage("test-endpoint");
 
             var messageId = "myId";
 
@@ -35,7 +35,7 @@
         [Test]
         public async Task Should_not_remove_non_dispatched_messages()
         {
-            var storage = new NonDurableOutboxStorage();
+            var storage = new NonDurableOutboxStorage("test-endpoint");
 
             var messageId = "myId";
 
@@ -57,11 +57,9 @@
         [Test]
         public async Task Should_clear_dispatched_messages_after_given_expiry()
         {
-            var storage = new NonDurableOutboxStorage();
+            var storage = new NonDurableOutboxStorage("test-endpoint");
 
             var messageId = "myId";
-
-            var beforeStore = DateTime.UtcNow;
 
             var messageToStore = new OutboxMessage(messageId, new[] { new TransportOperation("x", null, null, null) });
             using (var transaction = await storage.BeginTransaction(new ContextBag()))
@@ -71,17 +69,20 @@
                 await transaction.Commit();
             }
 
-            // Account for the low resolution of DateTime.UtcNow.
-            var afterStore = DateTime.UtcNow.AddTicks(1);
-
             await storage.SetAsDispatched(messageId, new ContextBag());
 
-            storage.RemoveEntriesOlderThan(beforeStore);
+            var beforeExpiry = DateTime.UtcNow.AddMinutes(-1);
+
+            // Should not remove entries dispatched after the expiry threshold
+            storage.RemoveEntriesOlderThan(beforeExpiry);
 
             var message = await storage.Get(messageId, new ContextBag());
             Assert.That(message, Is.Not.Null);
 
-            storage.RemoveEntriesOlderThan(afterStore);
+            var afterExpiry = DateTime.UtcNow.AddMinutes(1);
+
+            // Should remove entries dispatched before the expiry threshold
+            storage.RemoveEntriesOlderThan(afterExpiry);
 
             message = await storage.Get(messageId, new ContextBag());
             Assert.That(message, Is.Null);
@@ -90,7 +91,7 @@
         [Test]
         public async Task Should_not_store_when_transaction_not_committed()
         {
-            var storage = new NonDurableOutboxStorage();
+            var storage = new NonDurableOutboxStorage("test-endpoint");
 
             var messageId = "myId";
 
@@ -110,7 +111,7 @@
         [Test]
         public async Task Should_store_when_transaction_committed()
         {
-            var storage = new NonDurableOutboxStorage();
+            var storage = new NonDurableOutboxStorage("test-endpoint");
 
             var messageId = "myId";
 
