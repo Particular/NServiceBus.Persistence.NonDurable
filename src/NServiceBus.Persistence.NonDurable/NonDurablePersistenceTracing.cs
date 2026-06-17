@@ -154,23 +154,29 @@ static class NonDurablePersistenceTracing
         "subscription",
         new TagList { { CountTag, messageTypesCount } });
 
-    public static void AddTransactionEnlistedEvent(string operationType) =>
-        Activity.Current?.AddEvent(new ActivityEvent(TransactionEnlistedEvent, tags: new ActivityTagsCollection
+    public static void AddTransactionEnlistedEvent(Activity? activity, string operationType)
+    {
+        activity?.AddEvent(new ActivityEvent(TransactionEnlistedEvent, tags: new ActivityTagsCollection
         {
             [PersistenceTypeTag] = operationType
         }));
+    }
 
-    public static void AddTransactionCommittedEvent(int operationCount) =>
-        Activity.Current?.AddEvent(new ActivityEvent(TransactionCommittedEvent, tags: new ActivityTagsCollection
+    public static void AddTransactionCommittedEvent(Activity? activity, int operationCount)
+    {
+        activity?.AddEvent(new ActivityEvent(TransactionCommittedEvent, tags: new ActivityTagsCollection
         {
             [CountTag] = operationCount
         }));
+    }
 
-    public static void AddTransactionRolledBackEvent(int operationCount) =>
-        Activity.Current?.AddEvent(new ActivityEvent(TransactionRolledBackEvent, tags: new ActivityTagsCollection
+    public static void AddTransactionRolledBackEvent(Activity? activity, int operationCount)
+    {
+        activity?.AddEvent(new ActivityEvent(TransactionRolledBackEvent, tags: new ActivityTagsCollection
         {
             [CountTag] = operationCount
         }));
+    }
 
     public static void AddStagedEvent(Activity? activity, int? count = null)
     {
@@ -223,6 +229,7 @@ static class NonDurablePersistenceTracing
         }
 
         activity.SetStatus(ActivityStatusCode.Ok);
+        activity.SetTag("otel.status_code", "OK");
     }
 
     public static void MarkError(Activity? activity, Exception ex, bool exceptionEscaped = true)
@@ -239,7 +246,7 @@ static class NonDurablePersistenceTracing
         activity.AddEvent(new ActivityEvent("exception", DateTimeOffset.UtcNow,
         [
             new KeyValuePair<string, object?>("exception.escaped", exceptionEscaped),
-            new KeyValuePair<string, object?>("exception.type", ex.GetType()),
+            new KeyValuePair<string, object?>("exception.type", ex.GetType().FullName),
             new KeyValuePair<string, object?>("exception.message", ex.Message),
             new KeyValuePair<string, object?>("exception.stacktrace", ex.ToString())
         ]));

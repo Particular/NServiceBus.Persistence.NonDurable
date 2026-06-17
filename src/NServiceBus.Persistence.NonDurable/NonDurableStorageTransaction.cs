@@ -2,6 +2,7 @@ namespace NServiceBus;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 class NonDurableStorageTransaction
 {
@@ -9,7 +10,9 @@ class NonDurableStorageTransaction
     {
         ArgumentNullException.ThrowIfNull(apply);
         enlistedOperations.Add(new TransactionOperation<TState>(state, apply, rollback));
-        NonDurablePersistenceTracing.AddTransactionEnlistedEvent(typeof(TState).Name);
+
+        tracingActivity ??= Activity.Current;
+        NonDurablePersistenceTracing.AddTransactionEnlistedEvent(tracingActivity, typeof(TState).Name);
     }
 
     public void Commit()
@@ -39,14 +42,14 @@ class NonDurableStorageTransaction
                 operation.Rollback();
             }
 
-            NonDurablePersistenceTracing.AddTransactionRolledBackEvent(operationCount);
+            NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, operationCount);
             throw;
         }
         finally
         {
             if (committed)
             {
-                NonDurablePersistenceTracing.AddTransactionCommittedEvent(operationCount);
+                NonDurablePersistenceTracing.AddTransactionCommittedEvent(tracingActivity, operationCount);
             }
             enlistedOperations.Clear();
         }
@@ -54,11 +57,12 @@ class NonDurableStorageTransaction
 
     public void Rollback()
     {
-        NonDurablePersistenceTracing.AddTransactionRolledBackEvent(enlistedOperations.Count);
+        NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, enlistedOperations.Count);
         enlistedOperations.Clear();
     }
 
     readonly List<ITransactionOperation> enlistedOperations = [];
+    Activity? tracingActivity;
 
     interface ITransactionOperation
     {

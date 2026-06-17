@@ -55,7 +55,7 @@ public class When_emitting_persistence_spans
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaUpdateActivityName), Is.True);
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaCompleteActivityName), Is.True);
             Assert.That(activities.Any(a => a.Events.Any(e => e.Name == "nondurable.persistence.transaction.enlisted")), Is.True);
-            Assert.That(root.Events.Any(e => e.Name == "nondurable.persistence.transaction.committed"), Is.True);
+            Assert.That(activities.Any(a => a.Events.Any(e => e.Name == "nondurable.persistence.transaction.committed")), Is.True);
         }
     }
 
