@@ -23,4 +23,13 @@ public sealed class NonDurablePersistenceOptions
     /// When set to <c>null</c>, <see cref="TimeProvider.System"/> is used.
     /// </summary>
     public TimeProvider? TimeProvider { get; init; }
+
+    /// <summary>
+    /// Gets or sets the saga persistence options. When set to a non-null value, custom saga configuration is applied.
+    /// </summary>
+    /// <remarks>
+    /// Saga data is the only persistence state that is JSON-serialized; outbox and subscription storage are unaffected
+    /// by these settings.
+    /// </remarks>
+    public SagaOptions? Saga { get; set; }
 }

@@ -5,13 +5,13 @@ namespace NServiceBus
     public class NonDurablePersistence : NServiceBus.Persistence.PersistenceDefinition, NServiceBus.Persistence.IPersistenceDefinitionFactory<NServiceBus.NonDurablePersistence> { }
     public static class NonDurablePersistenceConfigurationExtensions
     {
-        public static void SerializerOptions(this NServiceBus.PersistenceExtensions<NServiceBus.NonDurablePersistence> persistenceExtensions, System.Text.Json.JsonSerializerOptions options) { }
         public static NServiceBus.PersistenceExtensions<NServiceBus.NonDurablePersistence> UseNonDurablePersistence(this NServiceBus.EndpointConfiguration configuration) { }
         public static NServiceBus.PersistenceExtensions<NServiceBus.NonDurablePersistence> UseNonDurablePersistence(this NServiceBus.EndpointConfiguration configuration, NServiceBus.NonDurablePersistenceOptions options) { }
     }
     public sealed class NonDurablePersistenceOptions
     {
         public NonDurablePersistenceOptions() { }
+        public NServiceBus.SagaOptions? Saga { get; set; }
         public NServiceBus.NonDurableStorage? Storage { get; init; }
         public System.TimeProvider? TimeProvider { get; init; }
     }
@@ -24,6 +24,11 @@ namespace NServiceBus
     {
         public NonDurableStorageOptions() { }
         public System.TimeProvider? TimeProvider { get; init; }
+    }
+    public sealed class SagaOptions
+    {
+        public SagaOptions() { }
+        public System.Text.Json.JsonSerializerOptions? JsonSerializerOptions { get; set; }
     }
 }
 namespace NServiceBus.Persistence.NonDurable

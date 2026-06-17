@@ -1,7 +1,6 @@
 namespace NServiceBus;
 
 using System;
-using System.Text.Json;
 using Configuration.AdvancedExtensibility;
 
 /// <summary>
@@ -33,18 +32,5 @@ public static class NonDurablePersistenceConfigurationExtensions
         var persistenceExtensions = configuration.UsePersistence<NonDurablePersistence>();
         persistenceExtensions.GetSettings().Set(options);
         return persistenceExtensions;
-    }
-
-    /// <summary>
-    /// Configures the <see cref="JsonSerializerOptions"/> used for serializing saga data.
-    /// </summary>
-    /// <param name="persistenceExtensions">The persistence extensions to extend.</param>
-    /// <param name="options">The <see cref="JsonSerializerOptions"/> to use.</param>
-    public static void SerializerOptions(this PersistenceExtensions<NonDurablePersistence> persistenceExtensions, JsonSerializerOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(persistenceExtensions);
-        ArgumentNullException.ThrowIfNull(options);
-
-        persistenceExtensions.GetSettings().Set(Features.NonDurableSagaPersistence.SerializerOptionsKey, options);
     }
 }

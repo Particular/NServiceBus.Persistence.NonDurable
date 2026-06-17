@@ -19,7 +19,7 @@ sealed class NonDurableSagaPersistence : Feature
         var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
 
-        var serializerOptions = context.Settings.GetOrDefault<System.Text.Json.JsonSerializerOptions>(SerializerOptionsKey)
+        var serializerOptions = persistenceOptions?.Saga?.JsonSerializerOptions
             ?? new System.Text.Json.JsonSerializerOptions
             {
                 Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
@@ -32,6 +32,4 @@ sealed class NonDurableSagaPersistence : Feature
                 sp.GetRequiredService<NonDurableSagaPersisterSettings>()));
         context.Services.AddSingleton<ISagaPersister>(sp => sp.GetRequiredService<NonDurableSagaPersister>());
     }
-
-    internal static readonly string SerializerOptionsKey = "NonDurableSagaPersistence.SerializerOptions";
 }
