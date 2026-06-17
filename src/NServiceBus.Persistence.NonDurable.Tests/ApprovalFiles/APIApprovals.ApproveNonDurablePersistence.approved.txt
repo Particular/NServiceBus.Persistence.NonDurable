@@ -30,6 +30,7 @@ namespace NServiceBus.Persistence.NonDurable
 {
     public static class NonDurableOutboxSettingsExtensions
     {
+        public static NServiceBus.Outbox.OutboxSettings FrequencyToRunDeduplicationDataCleanup(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
         public static NServiceBus.Outbox.OutboxSettings TimeToKeepDeduplicationData(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
     }
     public class NonDurableSagaPersisterSettings

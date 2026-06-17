@@ -25,6 +25,11 @@ sealed class NonDurableOutboxPersistence : Feature
         context.Services.AddSingleton<IOutboxStorage>(sp => sp.GetRequiredService<NonDurableOutboxStorage>());
 
         var timeToKeepDeduplicationEntries = context.Settings.Get<TimeSpan>("Outbox.TimeToKeepDeduplicationEntries");
-        context.RegisterStartupTask(sp => new OutboxCleaner(sp.GetRequiredService<NonDurableOutboxStorage>(), timeToKeepDeduplicationEntries));
+        var timeToCheckForDuplicateEntries = context.Settings.GetOrDefault<TimeSpan>("Outbox.NonDurableTimeToCheckForDuplicateEntries");
+        if (timeToCheckForDuplicateEntries <= TimeSpan.Zero)
+        {
+            timeToCheckForDuplicateEntries = TimeSpan.FromMinutes(1);
+        }
+        context.RegisterStartupTask(sp => new OutboxCleaner(sp.GetRequiredService<NonDurableOutboxStorage>(), timeToKeepDeduplicationEntries, timeToCheckForDuplicateEntries));
     }
 }

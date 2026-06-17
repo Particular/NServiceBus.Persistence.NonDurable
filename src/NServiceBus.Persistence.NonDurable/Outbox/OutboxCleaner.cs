@@ -9,11 +9,11 @@ using Features;
 /// Background task that periodically cleans up old dispatched outbox entries.
 /// Uses PeriodicTimer for async-friendly periodic execution.
 /// </summary>
-class OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplicationData) : FeatureStartupTask
+class OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplicationData, TimeSpan timeToCheckForDuplicateEntries) : FeatureStartupTask
 {
     protected override Task OnStart(IMessageSession session, CancellationToken cancellationToken = default)
     {
-        cleanupTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        cleanupTimer = new PeriodicTimer(timeToCheckForDuplicateEntries);
         cleanupTask = RunCleanupLoopAsync(cleanupTimer, cancellationToken);
         return Task.CompletedTask;
     }
