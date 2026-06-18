@@ -1,5 +1,6 @@
 namespace NServiceBus.Features;
 
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using NServiceBus.Persistence.NonDurable;
 using NServiceBus.Sagas;
@@ -19,11 +20,7 @@ sealed class NonDurableSagaPersistence : Feature
         var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
 
-        var serializerOptions = persistenceOptions?.Saga?.JsonSerializerOptions
-            ?? new System.Text.Json.JsonSerializerOptions
-            {
-                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
-            };
+        var serializerOptions = persistenceOptions?.Saga?.JsonSerializerOptions ?? new JsonSerializerOptions();
 
         context.Services.AddSingleton(new NonDurableSagaPersisterSettings(serializerOptions));
         context.Services.AddSingleton(sp =>
