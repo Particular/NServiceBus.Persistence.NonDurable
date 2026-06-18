@@ -13,7 +13,8 @@
         {
             var saga = new TestSagaData
             {
-                Id = Guid.NewGuid()
+                Id = Guid.NewGuid(),
+                SomeId = "Original"
             };
             var persister = new NonDurableSagaPersister();
             var insertSession = new NonDurableSynchronizedStorageSession();
@@ -21,14 +22,18 @@
             await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), insertSession, new ContextBag());
             await insertSession.CompleteAsync();
 
+            saga.SomeId = "Changed";
+
             var returnedSaga1 =
                 await persister.Get<TestSagaData>(saga.Id, new NonDurableSynchronizedStorageSession(), new ContextBag());
-            var returnedSaga2 = await persister.Get<TestSagaData>("Id", saga.Id,
+            var returnedSaga2 = await persister.Get<TestSagaData>("SomeId", "Original",
                 new NonDurableSynchronizedStorageSession(), new ContextBag());
             Assert.Multiple(() =>
             {
                 Assert.That(returnedSaga1, Is.Not.SameAs(returnedSaga2));
                 Assert.That(saga, Is.Not.SameAs(returnedSaga1));
+                Assert.That(returnedSaga1.SomeId, Is.EqualTo("Original"));
+                Assert.That(returnedSaga2.SomeId, Is.EqualTo("Original"));
             });
             Assert.That(saga, Is.Not.SameAs(returnedSaga2));
         }

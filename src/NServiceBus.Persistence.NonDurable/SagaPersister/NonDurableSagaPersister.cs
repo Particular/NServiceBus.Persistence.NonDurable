@@ -123,7 +123,17 @@ class NonDurableSagaPersister(NonDurableSagaPersisterSettings settings) : ISagaP
                     throw new Exception($"NonDurableSagaPersister concurrency violation: saga entity Id[{state.SagaId}] was modified by another process.");
                 }
             },
-            static state => state.Sagas.TryUpdate(state.SagaId, state.Entry, state.UpdatedEntry));
+            static state =>
+            {
+                // Restore the original entry by reading the live value and swapping it back.
+                // Comparing against the live value (rather than the captured updated entry) keeps
+                // rollback correct under DTC two-phase commit, where the prepare and rollback
+                // phases are driven by the distributed transaction coordinator on a separate thread.
+                if (state.Sagas.TryGetValue(state.SagaId, out var currentEntry))
+                {
+                    state.Sagas.TryUpdate(state.SagaId, state.Entry, currentEntry);
+                }
+            });
         NonDurablePersistenceTracing.AddStagedEvent(activity);
         NonDurablePersistenceTracing.MarkSuccess(activity);
 

@@ -3,13 +3,19 @@ namespace NServiceBus;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 class NonDurableStorageTransaction
 {
     public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null)
     {
         ArgumentNullException.ThrowIfNull(apply);
-        enlistedOperations.Add(new TransactionOperation<TState>(state, apply, rollback));
+        var operation = new TransactionOperation<TState>(state, apply, rollback);
+        enlistedOperations.Add(operation);
+        if (operation.CanRollback)
+        {
+            rollbackOperations.Add(operation);
+        }
 
         tracingActivity ??= Activity.Current;
         NonDurablePersistenceTracing.AddTransactionEnlistedEvent(tracingActivity, typeof(TState).Name);
@@ -17,9 +23,12 @@ class NonDurableStorageTransaction
 
     public void Commit()
     {
-        var appliedOperations = new Stack<ITransactionOperation>();
+        if (Volatile.Read(ref committed) != 0 || Volatile.Read(ref rollbackWasCalled) != 0)
+        {
+            return;
+        }
+
         var operationCount = enlistedOperations.Count;
-        var committed = false;
 
         try
         {
@@ -27,42 +36,53 @@ class NonDurableStorageTransaction
             {
                 operation.Apply();
 
-                if (operation.CanRollback)
-                {
-                    appliedOperations.Push(operation);
-                }
+                appliedOperations.Push(operation);
             }
 
-            committed = true;
+            Volatile.Write(ref committed, 1);
+            NonDurablePersistenceTracing.AddTransactionCommittedEvent(tracingActivity, operationCount);
         }
         catch
         {
-            while (appliedOperations.TryPop(out var operation))
-            {
-                operation.Rollback();
-            }
+            RollbackAppliedOperations();
 
             NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, operationCount);
             throw;
-        }
-        finally
-        {
-            if (committed)
-            {
-                NonDurablePersistenceTracing.AddTransactionCommittedEvent(tracingActivity, operationCount);
-            }
-            enlistedOperations.Clear();
         }
     }
 
     public void Rollback()
     {
-        NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, enlistedOperations.Count);
+        if (Interlocked.Exchange(ref rollbackWasCalled, 1) != 0)
+        {
+            return;
+        }
+
+        var operationCount = enlistedOperations.Count;
+
+        foreach (var operation in rollbackOperations)
+        {
+            operation.Rollback();
+        }
+
+        NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, operationCount);
         enlistedOperations.Clear();
     }
 
+    void RollbackAppliedOperations()
+    {
+        while (appliedOperations.TryPop(out var operation))
+        {
+            operation.Rollback();
+        }
+    }
+
     readonly List<ITransactionOperation> enlistedOperations = [];
+    readonly List<ITransactionOperation> rollbackOperations = [];
+    readonly Stack<ITransactionOperation> appliedOperations = [];
     Activity? tracingActivity;
+    int committed;
+    int rollbackWasCalled;
 
     interface ITransactionOperation
     {

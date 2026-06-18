@@ -5,26 +5,13 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-/// <summary>
-/// Represents a stored saga entry with versioning for optimistic concurrency control.
-/// Uses System.Text.Json for deep copying to ensure AOT/trimming compatibility.
-/// </summary>
 class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int version, JsonSerializerOptions serializerOptions)
 {
     public CorrelationId CorrelationId { get; } = correlationId;
 
     public int Version { get; } = version;
 
-    /// <summary>
-    /// Creates a deep copy of the saga data using System.Text.Json serialization.
-    /// This approach is AOT and trimming compatible.
-    /// </summary>
-    public IContainSagaData GetSagaCopy()
-    {
-        var type = sagaData.GetType();
-        var json = Serialize(sagaData, type, serializerOptions);
-        return (IContainSagaData)Deserialize(json, type, serializerOptions)!;
-    }
+    public IContainSagaData GetSagaCopy() => (IContainSagaData)Deserialize(serializedSagaData, sagaDataType, serializerOptions);
 
     public SagaEntry UpdateTo(IContainSagaData newSagaData, JsonSerializerOptions newSerializerOptions)
         => new(newSagaData, CorrelationId, Version + 1, newSerializerOptions);
@@ -60,8 +47,7 @@ class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int vers
         "AOT",
         "IL3050",
         Justification = "Only called when System.Text.Json reflection serialization is enabled.")]
-    static string SerializeWithReflection(object value, Type runtimeType, JsonSerializerOptions options)
-        => JsonSerializer.Serialize(value, runtimeType, options);
+    static string SerializeWithReflection(object value, Type runtimeType, JsonSerializerOptions options) => JsonSerializer.Serialize(value, runtimeType, options);
 
     [UnconditionalSuppressMessage(
         "Trimming",
@@ -71,6 +57,8 @@ class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int vers
         "AOT",
         "IL3050",
         Justification = "Only called when System.Text.Json reflection serialization is enabled.")]
-    static object DeserializeWithReflection(string json, Type runtimeType, JsonSerializerOptions options)
-        => JsonSerializer.Deserialize(json, runtimeType, options)!;
+    static object DeserializeWithReflection(string json, Type runtimeType, JsonSerializerOptions options) => JsonSerializer.Deserialize(json, runtimeType, options)!;
+
+    readonly Type sagaDataType = sagaData.GetType();
+    readonly string serializedSagaData = Serialize(sagaData, sagaData.GetType(), serializerOptions);
 }
