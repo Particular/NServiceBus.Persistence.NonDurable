@@ -5,7 +5,6 @@
     using System.Threading.Tasks;
     using AcceptanceTesting;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
-    using Configuration.AdvancedExtensibility;
     using NUnit.Framework;
 
     public class When_setting_timetokeepdeduplicationdata
@@ -33,12 +32,12 @@
                 .Done(c => (c.ProcessedIds.TryGetValue("1", out _) || c.ProcessedIds.TryGetValue("2", out _)) && c.ProcessedIds.TryGetValue("3", out _))
                 .Run();
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.ProcessedIds.ContainsKey("1") || context.ProcessedIds.ContainsKey("2"), Is.True, "Either copy 1 or 2 should be processed");
                 Assert.That(context.ProcessedIds.ContainsKey("1") && context.ProcessedIds.ContainsKey("2"), Is.False, "Copy 1 and 2 should not both be processed");
                 Assert.That(context.ProcessedIds.ContainsKey("3"), Is.True, "Copy 3 should be processed because it is sent after the expiration period");
-            });
+            }
         }
 
         /// <summary>
@@ -61,29 +60,24 @@
 
         class OutboxEndpoint : EndpointConfigurationBuilder
         {
-            public OutboxEndpoint()
-            {
+            public OutboxEndpoint() =>
                 EndpointSetup<DefaultServer>(b =>
                 {
                     // limit to one to avoid race conditions on dispatch and this allows us to reliably check whether deduplication happens properly
                     b.LimitMessageProcessingConcurrencyTo(1);
                     b.ConfigureTransport().TransportTransactionMode = TransportTransactionMode.ReceiveOnly;
-                    b.EnableOutbox().TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3));
-                    b.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", TimeSpan.FromMilliseconds(100));
+                    b.EnableOutbox()
+                        .TimeToKeepDeduplicationData(TimeSpan.FromSeconds(3))
+                        .FrequencyToRunDeduplicationDataCleanup(TimeSpan.FromMilliseconds(100));
                 });
-            }
 
-            class PlaceOrderHandler : IHandleMessages<PlaceOrder>
+            class PlaceOrderHandler(Context testContext) : IHandleMessages<PlaceOrder>
             {
-                public PlaceOrderHandler(Context testContext) => this.testContext = testContext;
-
                 public Task Handle(PlaceOrder message, IMessageHandlerContext context)
                 {
                     testContext.ProcessedIds[context.MessageHeaders[NServiceBusPersistenceNonDurableUniqueIdHeader]] = true;
                     return Task.CompletedTask;
                 }
-
-                readonly Context testContext;
             }
         }
 

@@ -1,41 +1,50 @@
-﻿namespace NServiceBus.PersistenceTesting
+namespace NServiceBus.PersistenceTesting;
+
+using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using NServiceBus.Outbox;
+using NServiceBus.Persistence;
+using NServiceBus.Persistence.NonDurable;
+using NServiceBus.Sagas;
+
+public partial class PersistenceTestsConfiguration
 {
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using NServiceBus;
-    using NServiceBus.Outbox;
-    using NServiceBus.Sagas;
-    using Persistence;
+    public bool SupportsDtc => OperatingSystem.IsWindows();
 
-    public partial class PersistenceTestsConfiguration
+    public bool SupportsOutbox => true;
+
+    public bool SupportsFinders => false;
+
+    public bool SupportsPessimisticConcurrency => false;
+
+    public ISagaIdGenerator SagaIdGenerator { get; private set; }
+
+    public ISagaPersister SagaStorage { get; private set; }
+
+    public Func<ICompletableSynchronizedStorageSession> CreateStorageSession { get; private set; }
+
+    public IOutboxStorage OutboxStorage { get; private set; }
+
+    public Task Configure(CancellationToken cancellationToken = default)
     {
-        public bool SupportsDtc => OperatingSystem.IsWindows();
+        SagaIdGenerator = new DefaultSagaIdGenerator();
 
-        public bool SupportsOutbox => true;
+        var settings = new NonDurableSagaPersisterSettings(new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } });
 
-        public bool SupportsFinders => false;
+        SagaStorage = new NonDurableSagaPersister(settings);
+        OutboxStorage = new NonDurableOutboxStorage("test-endpoint");
+        CreateStorageSession = () => new NonDurableSynchronizedStorageSession();
 
-        public bool SupportsPessimisticConcurrency => false;
-
-        public ISagaIdGenerator SagaIdGenerator { get; private set; }
-
-        public ISagaPersister SagaStorage { get; private set; }
-
-        public Func<ICompletableSynchronizedStorageSession> CreateStorageSession { get; private set; }
-
-        public IOutboxStorage OutboxStorage { get; private set; }
-
-        public Task Configure(CancellationToken cancellationToken = default)
-        {
-            SagaIdGenerator = new DefaultSagaIdGenerator();
-            SagaStorage = new NonDurableSagaPersister();
-            CreateStorageSession = () => new NonDurableSynchronizedStorageSession();
-            OutboxStorage = new NonDurableOutboxStorage();
-
-            return Task.CompletedTask;
-        }
-
-        public Task Cleanup(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        return Task.CompletedTask;
     }
+
+    public Task Cleanup(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+class DefaultSagaIdGenerator : ISagaIdGenerator
+{
+    public Guid Generate(SagaIdGeneratorContext context) => Guid.NewGuid();
 }

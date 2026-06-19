@@ -1,12 +1,19 @@
-﻿namespace NServiceBus.Features
+namespace NServiceBus.Features;
+
+using Microsoft.Extensions.DependencyInjection;
+using Persistence.NonDurable;
+using Persistence.NonDurable.SubscriptionStorage;
+using Unicast.Subscriptions.MessageDrivenSubscriptions;
+
+sealed class NonDurableSubscriptionPersistence : Feature
 {
-    using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
-    using Microsoft.Extensions.DependencyInjection;
+    public NonDurableSubscriptionPersistence() => DependsOn("NServiceBus.Features.MessageDrivenSubscriptions");
 
-    sealed class NonDurableSubscriptionPersistence : Feature
+    protected override void Setup(FeatureConfigurationContext context)
     {
-        public NonDurableSubscriptionPersistence() => DependsOn("NServiceBus.Features.MessageDrivenSubscriptions");
-
-        protected override void Setup(FeatureConfigurationContext context) => context.Services.AddSingleton<ISubscriptionStorage, NonDurableSubscriptionStorage>();
+        var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
+        NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
+        context.Services.AddSingleton(sp => new NonDurableSubscriptionStorage(sp.GetRequiredService<NonDurableStorage>()));
+        context.Services.AddSingleton<ISubscriptionStorage>(sp => sp.GetRequiredService<NonDurableSubscriptionStorage>());
     }
 }

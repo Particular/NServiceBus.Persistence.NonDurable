@@ -176,12 +176,10 @@
         {
             public EndpointThatHostsASaga() => EndpointSetup<DefaultServer>();
 
-            public class SupportedFieldTypesSaga : Saga<SupportedFieldTypesSagaData>,
+            public class SupportedFieldTypesSaga(Context testContext) : Saga<SupportedFieldTypesSagaData>,
                 IAmStartedByMessages<StartSaga>,
                 IHandleMessages<LoadTheSagaAgain>
             {
-                public SupportedFieldTypesSaga(Context context) => testContext = context;
-
                 public Task Handle(StartSaga message, IMessageHandlerContext context)
                 {
                     Data.StringArray = StringArray;
@@ -215,8 +213,6 @@
                     mapper.MapSaga(saga => saga.CorrelationId)
                         .ToMessage<StartSaga>(m => m.CorrelationId)
                         .ToMessage<LoadTheSagaAgain>(m => m.DataId);
-
-                Context testContext;
             }
         }
 

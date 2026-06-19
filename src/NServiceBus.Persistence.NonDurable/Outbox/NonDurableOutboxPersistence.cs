@@ -1,75 +1,35 @@
-﻿namespace NServiceBus.Features
+namespace NServiceBus.Features;
+
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using NServiceBus.Outbox;
+using NServiceBus.Persistence.NonDurable;
+
+sealed class NonDurableOutboxPersistence : Feature
 {
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.Extensions.DependencyInjection;
-    using NServiceBus.Outbox;
-
-    class NonDurableOutboxPersistence : Feature
+    public NonDurableOutboxPersistence()
     {
-        public NonDurableOutboxPersistence()
+        DependsOn<Outbox>();
+        DependsOn<NonDurableTransactionalStorageFeature>();
+
+        Enable<NonDurableTransactionalStorageFeature>();
+    }
+
+    protected override void Setup(FeatureConfigurationContext context)
+    {
+        var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
+        NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
+
+        var endpointName = context.Settings.EndpointName();
+        context.Services.AddSingleton(sp => new NonDurableOutboxStorage(endpointName, sp.GetRequiredService<NonDurableStorage>()));
+        context.Services.AddSingleton<IOutboxStorage>(sp => sp.GetRequiredService<NonDurableOutboxStorage>());
+
+        var timeToKeepDeduplicationEntries = context.Settings.Get<TimeSpan>("Outbox.TimeToKeepDeduplicationEntries");
+        var timeToCheckForDuplicateEntries = context.Settings.GetOrDefault<TimeSpan>("Outbox.NonDurableTimeToCheckForDuplicateEntries");
+        if (timeToCheckForDuplicateEntries <= TimeSpan.Zero)
         {
-            Enable<NonDurableTransactionalStorageFeature>();
-
-            DependsOn<Outbox>();
-            DependsOn<NonDurableTransactionalStorageFeature>();
+            timeToCheckForDuplicateEntries = TimeSpan.FromMinutes(1);
         }
-
-        protected override void Setup(FeatureConfigurationContext context)
-        {
-            var outboxStorage = new NonDurableOutboxStorage();
-            context.Services.AddSingleton(typeof(IOutboxStorage), outboxStorage);
-
-            var deduplicationPeriod = context.Settings.Get<TimeSpan>(TimeToKeepDeduplicationEntries);
-            if (!context.Settings.TryGet(IntervalToCheckForDuplicateEntries, out TimeSpan cleanupInterval))
-            {
-                cleanupInterval = TimeSpan.FromMinutes(1);
-            }
-
-            context.RegisterStartupTask(new OutboxCleaner(outboxStorage, deduplicationPeriod, cleanupInterval));
-        }
-
-        public const string TimeToKeepDeduplicationEntries = "Outbox.TimeToKeepDeduplicationEntries";
-        public const string IntervalToCheckForDuplicateEntries = "Outbox.NonDurableTimeToCheckForDuplicateEntries";
-
-        class OutboxCleaner : FeatureStartupTask
-        {
-            public OutboxCleaner(NonDurableOutboxStorage storage, TimeSpan timeToKeepDeduplicationData, TimeSpan intervalToCheckForDuplicates)
-            {
-                this.timeToKeepDeduplicationData = timeToKeepDeduplicationData;
-                this.intervalToCheckForDuplicates = intervalToCheckForDuplicates;
-                nonDurableOutboxStorage = storage;
-            }
-
-            protected override Task OnStart(IMessageSession session, CancellationToken cancellationToken = default)
-            {
-                cleanupTimer = new Timer(PerformCleanup, null, intervalToCheckForDuplicates, intervalToCheckForDuplicates);
-                return Task.CompletedTask;
-            }
-
-            protected override Task OnStop(IMessageSession session, CancellationToken cancellationToken = default)
-            {
-                using (var waitHandle = new ManualResetEvent(false))
-                {
-                    cleanupTimer.Dispose(waitHandle);
-
-                    // TODO: Use async synchronization primitive
-                    waitHandle.WaitOne();
-                }
-                return Task.CompletedTask;
-            }
-
-            void PerformCleanup(object state)
-            {
-                nonDurableOutboxStorage.RemoveEntriesOlderThan(DateTime.UtcNow - timeToKeepDeduplicationData);
-            }
-
-            readonly NonDurableOutboxStorage nonDurableOutboxStorage;
-            readonly TimeSpan timeToKeepDeduplicationData;
-            readonly TimeSpan intervalToCheckForDuplicates;
-
-            Timer cleanupTimer;
-        }
+        context.RegisterStartupTask(sp => new OutboxCleaner(sp.GetRequiredService<NonDurableOutboxStorage>(), timeToKeepDeduplicationEntries, timeToCheckForDuplicateEntries));
     }
 }

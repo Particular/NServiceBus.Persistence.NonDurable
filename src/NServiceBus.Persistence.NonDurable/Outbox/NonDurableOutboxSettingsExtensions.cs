@@ -2,7 +2,6 @@ namespace NServiceBus.Persistence.NonDurable
 {
     using System;
     using Configuration.AdvancedExtensibility;
-    using Features;
     using Outbox;
 
     /// <summary>
@@ -23,7 +22,25 @@ namespace NServiceBus.Persistence.NonDurable
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(time, TimeSpan.Zero);
 
-            settings.GetSettings().Set(NonDurableOutboxPersistence.TimeToKeepDeduplicationEntries, time);
+            settings.GetSettings().Set("Outbox.TimeToKeepDeduplicationEntries", time);
+            return settings;
+        }
+
+        /// <summary>
+        /// Specifies the frequency at which the outbox cleanup task runs to remove deduplication entries that are older
+        /// than the configured <see cref="TimeToKeepDeduplicationData"/> period.
+        /// </summary>
+        /// <param name="settings">The outbox settings.</param>
+        /// <param name="time">
+        /// Defines the <see cref="TimeSpan"/> which indicates how frequently the deduplication data cleanup task should run.
+        /// For example, if <code>TimeSpan.FromMinutes(1)</code> is used, the cleanup task runs at most once per minute.
+        /// It is not possible to use a negative or zero TimeSpan value. When not specified, the cleanup task runs every minute.
+        /// </param>
+        public static OutboxSettings FrequencyToRunDeduplicationDataCleanup(this OutboxSettings settings, TimeSpan time)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(time, TimeSpan.Zero);
+
+            settings.GetSettings().Set("Outbox.NonDurableTimeToCheckForDuplicateEntries", time);
             return settings;
         }
     }

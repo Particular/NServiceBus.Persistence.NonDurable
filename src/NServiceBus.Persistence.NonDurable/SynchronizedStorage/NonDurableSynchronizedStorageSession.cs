@@ -1,113 +1,147 @@
-namespace NServiceBus
+namespace NServiceBus.Persistence.NonDurable;
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Transactions;
+using Extensibility;
+using Outbox;
+using Persistence;
+using Transport;
+
+class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSession
 {
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using System.Transactions;
-    using Extensibility;
-    using Outbox;
-    using Persistence;
-    using Transport;
+    public NonDurableStorageTransaction? Transaction { get; private set; }
 
-    class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSession
+    public void Dispose()
     {
-        public NonDurableTransaction Transaction { get; private set; }
-
-        public void Dispose() => Transaction = null;
-
-        public ValueTask DisposeAsync()
+        if (Transaction is null)
         {
-            Transaction = null;
-
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        public ValueTask<bool> TryOpen(IOutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken())
+        Transaction = null;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (Transaction is null)
         {
-            if (transaction is NonDurableOutboxTransaction inMemOutboxTransaction)
-            {
-                Transaction = inMemOutboxTransaction.Transaction;
-                return new ValueTask<bool>(true);
-            }
-            return new ValueTask<bool>(false);
+            return default;
         }
 
-        public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context, CancellationToken cancellationToken = new CancellationToken()) => TryOpen(transportTransaction, out _, cancellationToken);
+        Transaction = null;
+        return default;
+    }
 
-        internal ValueTask<bool> TryOpen(TransportTransaction transportTransaction, out EnlistmentNotification enlistmentNotification, CancellationToken cancellationToken = new CancellationToken())
+    public ValueTask<bool> TryOpen(IOutboxTransaction transaction, ContextBag context,
+        CancellationToken cancellationToken = default)
+    {
+        if (transaction is NonDurableOutboxTransaction nonDurableOutboxTransaction)
         {
-            if (transportTransaction.TryGet(out Transaction ambientTransaction))
-            {
-                Transaction = new NonDurableTransaction();
-                ownsNonDurableTransaction = true;
-                enlistedInAmbientTransaction = true;
-                enlistmentNotification = new EnlistmentNotification(Transaction);
-                ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
-                return new ValueTask<bool>(true);
-            }
+            Transaction = nonDurableOutboxTransaction.Transaction;
+            ownsTransaction = false;
+            return new ValueTask<bool>(true);
+        }
 
+        return new ValueTask<bool>(false);
+    }
+
+    public ValueTask<bool> TryOpen(TransportTransaction transportTransaction, ContextBag context,
+        CancellationToken cancellationToken = default) =>
+        TryOpen(transportTransaction, out _, cancellationToken);
+
+    internal ValueTask<bool> TryOpen(TransportTransaction transportTransaction,
+        out EnlistmentNotification? enlistmentNotification,
+        CancellationToken cancellationToken = default)
+    {
+        // Prefer the transport-level transaction if available (used by InMemory transport)
+        if (transportTransaction.TryGet<NonDurableStorageTransaction>(out var storageTransaction))
+        {
+            Transaction = storageTransaction;
+            ownsTransaction = false;
             enlistmentNotification = null;
-            return new ValueTask<bool>(false);
+            return new ValueTask<bool>(true);
         }
 
-        public Task Open(ContextBag contextBag, CancellationToken cancellationToken = new CancellationToken())
+        // Fall back to DTC/ambient transaction support
+        if (transportTransaction.TryGet(out Transaction? ambientTransaction) && ambientTransaction is not null)
         {
-            Transaction = new NonDurableTransaction();
-            ownsNonDurableTransaction = true;
-            return Task.CompletedTask;
+            Transaction = new NonDurableStorageTransaction();
+            ownsTransaction = true;
+            enlistedInAmbientTransaction = true;
+            enlistmentNotification = new EnlistmentNotification(Transaction);
+            ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
+            return new ValueTask<bool>(true);
         }
 
-        public Task CompleteAsync(CancellationToken cancellationToken = default)
-        {
-            if (ownsNonDurableTransaction && !enlistedInAmbientTransaction)
-            {
-                Transaction.Commit();
-            }
+        enlistmentNotification = null;
+        return new ValueTask<bool>(false);
+    }
 
-            return Task.CompletedTask;
+    public Task Open(ContextBag context, CancellationToken cancellationToken = default)
+    {
+        ownsTransaction = true;
+        Transaction = new NonDurableStorageTransaction();
+        return Task.CompletedTask;
+    }
+
+    public Task CompleteAsync(CancellationToken cancellationToken = default)
+    {
+        if (ownsTransaction && !enlistedInAmbientTransaction && Transaction is not null)
+        {
+            Transaction.Commit();
         }
 
-        public void Enlist(Action action, Action rollbackAction) => Transaction.Enlist(action, rollbackAction);
+        return Task.CompletedTask;
+    }
 
-        bool ownsNonDurableTransaction;
-        bool enlistedInAmbientTransaction;
+    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null)
+    {
+        ArgumentNullException.ThrowIfNull(apply);
+        ArgumentNullException.ThrowIfNull(Transaction);
+        Transaction.Enlist(state, apply, rollback);
+    }
 
-        internal class EnlistmentNotification : IEnlistmentNotification
+    bool ownsTransaction;
+    bool enlistedInAmbientTransaction;
+
+    internal class EnlistmentNotification : IEnlistmentNotification
+    {
+        public TaskCompletionSource TransactionCompletionSource { get; } = new TaskCompletionSource();
+
+        public EnlistmentNotification(NonDurableStorageTransaction transaction) =>
+            this.transaction = transaction;
+
+        public void Prepare(PreparingEnlistment preparingEnlistment)
         {
-            public TaskCompletionSource TransactionCompletionSource { get; private set; } = new TaskCompletionSource();
-
-            public EnlistmentNotification(NonDurableTransaction transaction) => this.transaction = transaction;
-
-            public void Prepare(PreparingEnlistment preparingEnlistment)
+            try
             {
-                try
-                {
-                    transaction.Commit();
-                    preparingEnlistment.Prepared();
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    preparingEnlistment.ForceRollback(ex);
-                }
+                transaction.Commit();
+                preparingEnlistment.Prepared();
             }
-
-            public void Commit(Enlistment enlistment)
-            {
-                enlistment.Done();
-                TransactionCompletionSource.SetResult();
-            }
-
-            public void Rollback(Enlistment enlistment)
+            catch (Exception ex)
             {
                 transaction.Rollback();
-                enlistment.Done();
-                TransactionCompletionSource.SetResult();
+                preparingEnlistment.ForceRollback(ex);
             }
-
-            public void InDoubt(Enlistment enlistment) => enlistment.Done();
-
-            readonly NonDurableTransaction transaction;
         }
+
+        public void Commit(Enlistment enlistment)
+        {
+            enlistment.Done();
+            TransactionCompletionSource.SetResult();
+        }
+
+        public void Rollback(Enlistment enlistment)
+        {
+            transaction.Rollback();
+            enlistment.Done();
+            TransactionCompletionSource.SetResult();
+        }
+
+        public void InDoubt(Enlistment enlistment) => enlistment.Done();
+
+        readonly NonDurableStorageTransaction transaction;
     }
 }

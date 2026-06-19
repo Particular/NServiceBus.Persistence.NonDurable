@@ -1,19 +1,32 @@
-﻿namespace NServiceBus.Features
+namespace NServiceBus.Features;
+
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using NServiceBus.Persistence.NonDurable;
+using NServiceBus.Sagas;
+
+sealed class NonDurableSagaPersistence : Feature
 {
-    using NServiceBus.Sagas;
-    using Microsoft.Extensions.DependencyInjection;
-
-    sealed class NonDurableSagaPersistence : Feature
+    public NonDurableSagaPersistence()
     {
-        public NonDurableSagaPersistence()
-        {
-            Enable<NonDurableTransactionalStorageFeature>();
+        DependsOn<Sagas>();
+        DependsOn<NonDurableTransactionalStorageFeature>();
 
-            DependsOn<Sagas>();
-            DependsOn<NonDurableTransactionalStorageFeature>();
-        }
+        Enable<NonDurableTransactionalStorageFeature>();
+    }
 
-        protected override void Setup(FeatureConfigurationContext context) =>
-            context.Services.AddSingleton<ISagaPersister, NonDurableSagaPersister>();
+    protected override void Setup(FeatureConfigurationContext context)
+    {
+        var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
+        NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
+
+        var serializerOptions = persistenceOptions?.Saga?.JsonSerializerOptions ?? new JsonSerializerOptions();
+
+        context.Services.AddSingleton(new NonDurableSagaPersisterSettings(serializerOptions));
+        context.Services.AddSingleton(sp =>
+            new NonDurableSagaPersister(
+                sp.GetRequiredService<NonDurableStorage>(),
+                sp.GetRequiredService<NonDurableSagaPersisterSettings>()));
+        context.Services.AddSingleton<ISagaPersister>(sp => sp.GetRequiredService<NonDurableSagaPersister>());
     }
 }
