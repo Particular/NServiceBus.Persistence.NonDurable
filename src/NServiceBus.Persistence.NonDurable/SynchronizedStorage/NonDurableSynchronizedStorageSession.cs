@@ -55,16 +55,6 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         out EnlistmentNotification? enlistmentNotification,
         CancellationToken cancellationToken = default)
     {
-        // Prefer the transport-level transaction if available (used by InMemory transport)
-        if (transportTransaction.TryGet<NonDurableStorageTransaction>(out var storageTransaction))
-        {
-            Transaction = storageTransaction;
-            ownsTransaction = false;
-            enlistmentNotification = null;
-            return new ValueTask<bool>(true);
-        }
-
-        // Fall back to DTC/ambient transaction support
         if (transportTransaction.TryGet(out Transaction? ambientTransaction) && ambientTransaction is not null)
         {
             Transaction = new NonDurableStorageTransaction();
