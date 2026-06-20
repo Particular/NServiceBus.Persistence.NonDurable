@@ -55,18 +55,31 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         out EnlistmentNotification? enlistmentNotification,
         CancellationToken cancellationToken = default)
     {
-        if (transportTransaction.TryGet(NonDurableTransactionKeys.Transaction, out Transaction? ambientTransaction) && ambientTransaction is not null)
+        // The dedicated key is the private contract with NServiceBus.Transport.NonDurable.
+        // The type-based key is the standard contract honored by the shared persistence
+        // test suite (and other transports), which publishes the ambient Transaction via
+        // transportTransaction.Set(Transaction.Current). Check the dedicated key first so a
+        // NonDurable transport transaction wins when both are present, then fall back to the
+        // type-based key.
+        if (!transportTransaction.TryGet(NonDurableTransactionKeys.Transaction, out Transaction? ambientTransaction)
+            && !transportTransaction.TryGet(out ambientTransaction))
         {
-            Transaction = new NonDurableStorageTransaction();
-            ownsTransaction = true;
-            enlistedInAmbientTransaction = true;
-            enlistmentNotification = new EnlistmentNotification(Transaction);
-            ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
-            return new ValueTask<bool>(true);
+            enlistmentNotification = null;
+            return new ValueTask<bool>(false);
         }
 
-        enlistmentNotification = null;
-        return new ValueTask<bool>(false);
+        if (ambientTransaction is null)
+        {
+            enlistmentNotification = null;
+            return new ValueTask<bool>(false);
+        }
+
+        Transaction = new NonDurableStorageTransaction();
+        ownsTransaction = true;
+        enlistedInAmbientTransaction = true;
+        enlistmentNotification = new EnlistmentNotification(Transaction);
+        ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
+        return new ValueTask<bool>(true);
     }
 
     public Task Open(ContextBag context, CancellationToken cancellationToken = default)

@@ -31,15 +31,22 @@ public class When_opening_storage_session_from_transport_transaction
     }
 
     [Test]
-    public async Task Should_ignore_type_keyed_transaction()
+    public async Task Should_fall_back_to_type_keyed_transaction_when_dedicated_key_is_absent()
     {
         using var transaction = new CommittableTransaction();
         var transportTransaction = new TransportTransaction();
         transportTransaction.Set<Transaction>(transaction);
         var session = new NonDurableSynchronizedStorageSession();
+        var applied = false;
 
         var opened = await session.TryOpen(transportTransaction, out _);
+        session.Enlist(new object(), _ => applied = true);
+        transaction.Commit();
 
-        Assert.That(opened, Is.False);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(opened, Is.True);
+            Assert.That(applied, Is.True);
+        }
     }
 }
