@@ -55,7 +55,7 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         out EnlistmentNotification? enlistmentNotification,
         CancellationToken cancellationToken = default)
     {
-        if (transportTransaction.TryGet(out Transaction? ambientTransaction) && ambientTransaction is not null)
+        if (transportTransaction.TryGet(NonDurableTransactionKeys.Transaction, out Transaction? ambientTransaction) && ambientTransaction is not null)
         {
             Transaction = new NonDurableStorageTransaction();
             ownsTransaction = true;

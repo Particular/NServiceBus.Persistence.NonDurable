@@ -30,7 +30,7 @@
                 transaction = Transaction.Current;
 
                 var transportTransaction = new TransportTransaction();
-                transportTransaction.Set(Transaction.Current);
+                transportTransaction.Set(NonDurableTransactionKeys.Transaction, Transaction.Current);
 
                 using var session = configuration.CreateStorageSession();
                 var contextBag = configuration.GetContextBagForSagaStorage();
