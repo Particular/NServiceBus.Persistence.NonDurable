@@ -55,28 +55,31 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         out EnlistmentNotification? enlistmentNotification,
         CancellationToken cancellationToken = default)
     {
-        // Prefer the transport-level transaction if available (used by InMemory transport)
-        if (transportTransaction.TryGet<NonDurableStorageTransaction>(out var storageTransaction))
+        // The dedicated key is the private contract with NServiceBus.Transport.NonDurable.
+        // The type-based key is the standard contract honored by the shared persistence
+        // test suite (and other transports), which publishes the ambient Transaction via
+        // transportTransaction.Set(Transaction.Current). Check the dedicated key first so a
+        // NonDurable transport transaction wins when both are present, then fall back to the
+        // type-based key.
+        if (!transportTransaction.TryGet(NonDurableTransactionKeys.Transaction, out Transaction? ambientTransaction)
+            && !transportTransaction.TryGet(out ambientTransaction))
         {
-            Transaction = storageTransaction;
-            ownsTransaction = false;
             enlistmentNotification = null;
-            return new ValueTask<bool>(true);
+            return new ValueTask<bool>(false);
         }
 
-        // Fall back to DTC/ambient transaction support
-        if (transportTransaction.TryGet(out Transaction? ambientTransaction) && ambientTransaction is not null)
+        if (ambientTransaction is null)
         {
-            Transaction = new NonDurableStorageTransaction();
-            ownsTransaction = true;
-            enlistedInAmbientTransaction = true;
-            enlistmentNotification = new EnlistmentNotification(Transaction);
-            ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
-            return new ValueTask<bool>(true);
+            enlistmentNotification = null;
+            return new ValueTask<bool>(false);
         }
 
-        enlistmentNotification = null;
-        return new ValueTask<bool>(false);
+        Transaction = new NonDurableStorageTransaction();
+        ownsTransaction = true;
+        enlistedInAmbientTransaction = true;
+        enlistmentNotification = new EnlistmentNotification(Transaction);
+        ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
+        return new ValueTask<bool>(true);
     }
 
     public Task Open(ContextBag context, CancellationToken cancellationToken = default)
