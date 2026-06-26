@@ -16,10 +16,7 @@ public class NonDurableStorage
     /// Initializes a new instance of <see cref="NonDurableStorage"/> with the specified options.
     /// </summary>
     /// <param name="options">The options to configure the non-durable persistence storage. When <c>null</c>, <see cref="TimeProvider.System"/> is used.</param>
-    public NonDurableStorage(NonDurableStorageOptions? options = null)
-    {
-        TimeProvider = options?.TimeProvider ?? TimeProvider.System;
-    }
+    public NonDurableStorage(NonDurableStorageOptions? options = null) => TimeProvider = options?.TimeProvider ?? TimeProvider.System;
 
     /// <summary>
     /// The <see cref="TimeProvider"/> used for outbox entry expiry and timestamps.

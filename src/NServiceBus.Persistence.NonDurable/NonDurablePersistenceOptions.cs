@@ -20,16 +20,15 @@ public sealed class NonDurablePersistenceOptions
 
     /// <summary>
     /// Gets or sets the <see cref="TimeProvider"/> used for outbox entry expiry and timestamps.
-    /// When set to <c>null</c>, <see cref="TimeProvider.System"/> is used.
     /// </summary>
-    public TimeProvider? TimeProvider { get; init; }
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <summary>
-    /// Gets or sets the saga persistence options. When set to a non-null value, custom saga configuration is applied.
+    /// Gets or sets the saga persistence options.
     /// </summary>
     /// <remarks>
     /// Saga data is the only persistence state that is JSON-serialized; outbox and subscription storage are unaffected
     /// by these settings.
     /// </remarks>
-    public SagaOptions? Saga { get; set; }
+    public NonDurableSagaOptions Saga { get; init; } = new NonDurableSagaOptions();
 }

@@ -11,7 +11,7 @@ sealed class NonDurableSubscriptionPersistence : Feature
 
     protected override void Setup(FeatureConfigurationContext context)
     {
-        var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
+        var persistenceOptions = context.Settings.Get<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
         context.Services.AddSingleton(sp => new NonDurableSubscriptionStorage(sp.GetRequiredService<NonDurableStorage>()));
         context.Services.AddSingleton<ISubscriptionStorage>(sp => sp.GetRequiredService<NonDurableSubscriptionStorage>());

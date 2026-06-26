@@ -2,8 +2,6 @@ namespace NServiceBus.Persistence.NonDurable.Tests.Design;
 
 using System;
 using System.Collections.Concurrent;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Extensibility;
 using NUnit.Framework;
@@ -106,9 +104,7 @@ public class When_ambient_transaction_aborts_after_prepare
     [Test]
     public async Task Should_undo_saga_update_when_prepare_applied_then_transaction_aborted()
     {
-        var storage = new NonDurableStorage();
-        var settings = new NonDurableSagaPersisterSettings(new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } });
-        var persister = new NonDurableSagaPersister(storage, settings);
+        var persister = new NonDurableSagaPersister();
 
         var saga = new Saga { Id = Guid.NewGuid(), SomeId = "x", LastUpdatedBy = "Unchanged" };
         var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);
@@ -147,9 +143,7 @@ public class When_ambient_transaction_aborts_after_prepare
     [Test]
     public async Task Should_restore_saga_when_completed_then_transaction_aborted()
     {
-        var storage = new NonDurableStorage();
-        var settings = new NonDurableSagaPersisterSettings(new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } });
-        var persister = new NonDurableSagaPersister(storage, settings);
+        var persister = new NonDurableSagaPersister();
 
         var saga = new Saga { Id = Guid.NewGuid(), SomeId = "x", LastUpdatedBy = "Unchanged" };
         var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);
