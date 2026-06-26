@@ -3,7 +3,6 @@ namespace NServiceBus.Persistence.NonDurable;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Extensibility;
@@ -11,16 +10,22 @@ using Persistence;
 using SagaPersister;
 using Sagas;
 
-class NonDurableSagaPersister(NonDurableSagaOptions options) : ISagaPersister
+class NonDurableSagaPersister : ISagaPersister
 {
-    public NonDurableSagaPersister(NonDurableStorage storage, NonDurableSagaOptions options) : this(options)
+    public NonDurableSagaPersister(NonDurableStorage storage, NonDurableSagaOptions options)
     {
+        this.options = options;
         sagas = storage.Sagas;
         byCorrelationId = storage.SagaCorrelationIds;
     }
 
-    public NonDurableSagaPersister() : this(new NonDurableSagaOptions { JsonSerializerOptions = new JsonSerializerOptions() })
+    // Simplified constructor for testing purposes, which creates a new NonDurableStorage instance.
+    public NonDurableSagaPersister()
     {
+        options = new NonDurableSagaOptions();
+        var storage = new NonDurableStorage();
+        sagas = storage.Sagas;
+        byCorrelationId = storage.SagaCorrelationIds;
     }
 
     public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
@@ -196,6 +201,7 @@ class NonDurableSagaPersister(NonDurableSagaOptions options) : ISagaPersister
         throw new Exception("The saga should be retrieved with Get method before it's updated.");
     }
 
+    readonly NonDurableSagaOptions options;
     readonly ConcurrentDictionary<Guid, SagaEntry> sagas = new();
     readonly ConcurrentDictionary<CorrelationId, Guid> byCorrelationId = new();
 
