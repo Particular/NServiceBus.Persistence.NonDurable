@@ -202,8 +202,8 @@ class NonDurableSagaPersister : ISagaPersister
     }
 
     readonly NonDurableSagaOptions options;
-    readonly ConcurrentDictionary<Guid, SagaEntry> sagas = new();
-    readonly ConcurrentDictionary<CorrelationId, Guid> byCorrelationId = new();
+    readonly ConcurrentDictionary<Guid, SagaEntry> sagas;
+    readonly ConcurrentDictionary<CorrelationId, Guid> byCorrelationId;
 
     readonly record struct SaveOperationState(
         ConcurrentDictionary<Guid, SagaEntry> Sagas,
