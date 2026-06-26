@@ -45,7 +45,7 @@ public partial class When_persisting_saga_data_with_custom_json_options : NServi
             {
                 c.UseNonDurablePersistence(new NonDurablePersistenceOptions
                 {
-                    Saga = new SagaOptions
+                    Saga = new NonDurableSagaOptions
                     {
                         JsonSerializerOptions = jsonOptions
                     }

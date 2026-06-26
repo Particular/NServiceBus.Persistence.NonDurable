@@ -29,7 +29,7 @@ public class When_registering_nondurable_storage
 
         var defaultServices = new ServiceCollection();
 
-        NonDurableStorageRuntime.Configure(defaultServices, persistenceOptions: null);
+        NonDurableStorageRuntime.Configure(defaultServices, new NonDurablePersistenceOptions());
 
         using var defaultProvider = defaultServices.BuildServiceProvider();
         Assert.That(defaultProvider.GetRequiredService<NonDurableStorage>(), Is.SameAs(NonDurableStorageRuntime.SharedStorage));

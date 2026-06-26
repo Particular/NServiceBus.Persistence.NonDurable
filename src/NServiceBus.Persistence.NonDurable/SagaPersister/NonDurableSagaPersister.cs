@@ -11,15 +11,15 @@ using Persistence;
 using SagaPersister;
 using Sagas;
 
-class NonDurableSagaPersister(NonDurableSagaPersisterSettings settings) : ISagaPersister
+class NonDurableSagaPersister(NonDurableSagaOptions options) : ISagaPersister
 {
-    public NonDurableSagaPersister(NonDurableStorage storage, NonDurableSagaPersisterSettings settings) : this(settings)
+    public NonDurableSagaPersister(NonDurableStorage storage, NonDurableSagaOptions options) : this(options)
     {
         sagas = storage.Sagas;
         byCorrelationId = storage.SagaCorrelationIds;
     }
 
-    public NonDurableSagaPersister() : this(new NonDurableSagaPersisterSettings(new JsonSerializerOptions()))
+    public NonDurableSagaPersister() : this(new NonDurableSagaOptions { JsonSerializerOptions = new JsonSerializerOptions() })
     {
     }
 
@@ -29,7 +29,7 @@ class NonDurableSagaPersister(NonDurableSagaPersisterSettings settings) : ISagaP
         var correlationId = correlationProperty != SagaCorrelationProperty.None
             ? new CorrelationId(sagaData.GetType(), correlationProperty)
             : NoCorrelationId;
-        var entry = new SagaEntry(sagaData, correlationId, version: 1, settings.SerializerOptions);
+        var entry = new SagaEntry(sagaData, correlationId, version: 1, options.JsonSerializerOptions);
 
         ((NonDurableSynchronizedStorageSession)session).Enlist(
             new SaveOperationState(sagas, byCorrelationId, sagaData.Id, correlationId, entry),
@@ -112,7 +112,7 @@ class NonDurableSagaPersister(NonDurableSagaPersisterSettings settings) : ISagaP
     {
         using var activity = NonDurablePersistenceTracing.StartSagaUpdate(sagaData.Id);
         var entry = GetEntry(context, sagaData.Id);
-        var updatedEntry = entry.UpdateTo(sagaData, settings.SerializerOptions);
+        var updatedEntry = entry.UpdateTo(sagaData, options.JsonSerializerOptions);
 
         ((NonDurableSynchronizedStorageSession)session).Enlist(
             new UpdateOperationState(sagas, sagaData.Id, entry, updatedEntry),
@@ -196,8 +196,8 @@ class NonDurableSagaPersister(NonDurableSagaPersisterSettings settings) : ISagaP
         throw new Exception("The saga should be retrieved with Get method before it's updated.");
     }
 
-    ConcurrentDictionary<Guid, SagaEntry> sagas = new();
-    ConcurrentDictionary<CorrelationId, Guid> byCorrelationId = new();
+    readonly ConcurrentDictionary<Guid, SagaEntry> sagas = new();
+    readonly ConcurrentDictionary<CorrelationId, Guid> byCorrelationId = new();
 
     readonly record struct SaveOperationState(
         ConcurrentDictionary<Guid, SagaEntry> Sagas,

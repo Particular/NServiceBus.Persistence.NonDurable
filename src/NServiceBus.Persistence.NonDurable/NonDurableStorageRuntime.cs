@@ -7,14 +7,9 @@ static class NonDurableStorageRuntime
 {
     public static NonDurableStorage SharedStorage { get; } = new();
 
-    public static void Configure(IServiceCollection services, NonDurablePersistenceOptions? persistenceOptions = null)
+    public static void Configure(IServiceCollection services, NonDurablePersistenceOptions persistenceOptions)
     {
-        var storage = persistenceOptions?.Storage
-            ?? (persistenceOptions?.TimeProvider is not null
-                ? new NonDurableStorage(new NonDurableStorageOptions { TimeProvider = persistenceOptions.TimeProvider })
-                : null)
-            ?? SharedStorage;
-
+        var storage = persistenceOptions.Storage ?? SharedStorage;
         services.TryAddSingleton(storage);
     }
 }

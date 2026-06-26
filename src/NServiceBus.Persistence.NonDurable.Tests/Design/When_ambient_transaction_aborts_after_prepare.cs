@@ -107,8 +107,8 @@ public class When_ambient_transaction_aborts_after_prepare
     public async Task Should_undo_saga_update_when_prepare_applied_then_transaction_aborted()
     {
         var storage = new NonDurableStorage();
-        var settings = new NonDurableSagaPersisterSettings(new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } });
-        var persister = new NonDurableSagaPersister(storage, settings);
+        var options = new NonDurableSagaOptions { JsonSerializerOptions = new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } } };
+        var persister = new NonDurableSagaPersister(storage, options);
 
         var saga = new Saga { Id = Guid.NewGuid(), SomeId = "x", LastUpdatedBy = "Unchanged" };
         var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);
@@ -148,8 +148,8 @@ public class When_ambient_transaction_aborts_after_prepare
     public async Task Should_restore_saga_when_completed_then_transaction_aborted()
     {
         var storage = new NonDurableStorage();
-        var settings = new NonDurableSagaPersisterSettings(new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } });
-        var persister = new NonDurableSagaPersister(storage, settings);
+        var options = new NonDurableSagaOptions { JsonSerializerOptions = new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } } };
+        var persister = new NonDurableSagaPersister(storage, options);
 
         var saga = new Saga { Id = Guid.NewGuid(), SomeId = "x", LastUpdatedBy = "Unchanged" };
         var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);

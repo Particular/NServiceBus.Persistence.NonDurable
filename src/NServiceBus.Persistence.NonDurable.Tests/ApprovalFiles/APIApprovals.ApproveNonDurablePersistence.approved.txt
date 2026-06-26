@@ -11,9 +11,14 @@ namespace NServiceBus
     public sealed class NonDurablePersistenceOptions
     {
         public NonDurablePersistenceOptions() { }
-        public NServiceBus.SagaOptions? Saga { get; set; }
+        public NServiceBus.NonDurableSagaOptions Saga { get; init; }
         public NServiceBus.NonDurableStorage? Storage { get; init; }
-        public System.TimeProvider? TimeProvider { get; init; }
+        public System.TimeProvider TimeProvider { get; init; }
+    }
+    public sealed class NonDurableSagaOptions
+    {
+        public NonDurableSagaOptions() { }
+        public System.Text.Json.JsonSerializerOptions JsonSerializerOptions { get; init; }
     }
     public class NonDurableStorage
     {
@@ -25,11 +30,6 @@ namespace NServiceBus
         public NonDurableStorageOptions() { }
         public System.TimeProvider? TimeProvider { get; init; }
     }
-    public sealed class SagaOptions
-    {
-        public SagaOptions() { }
-        public System.Text.Json.JsonSerializerOptions? JsonSerializerOptions { get; set; }
-    }
 }
 namespace NServiceBus.Persistence.NonDurable
 {
@@ -37,10 +37,5 @@ namespace NServiceBus.Persistence.NonDurable
     {
         public static NServiceBus.Outbox.OutboxSettings FrequencyToRunDeduplicationDataCleanup(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
         public static NServiceBus.Outbox.OutboxSettings TimeToKeepDeduplicationData(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
-    }
-    public class NonDurableSagaPersisterSettings
-    {
-        public NonDurableSagaPersisterSettings(System.Text.Json.JsonSerializerOptions serializerOptions) { }
-        public System.Text.Json.JsonSerializerOptions SerializerOptions { get; }
     }
 }

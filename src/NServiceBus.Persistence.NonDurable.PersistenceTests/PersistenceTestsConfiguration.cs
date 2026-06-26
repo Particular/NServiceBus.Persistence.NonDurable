@@ -32,9 +32,10 @@ public partial class PersistenceTestsConfiguration
     {
         SagaIdGenerator = new DefaultSagaIdGenerator();
 
-        var settings = new NonDurableSagaPersisterSettings(new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } });
-
-        SagaStorage = new NonDurableSagaPersister(settings);
+        SagaStorage = new NonDurableSagaPersister(new NonDurableSagaOptions
+        {
+            JsonSerializerOptions = new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }
+        });
         OutboxStorage = new NonDurableOutboxStorage("test-endpoint");
         CreateStorageSession = () => new NonDurableSynchronizedStorageSession();
 

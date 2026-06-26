@@ -19,7 +19,8 @@ public class When_emitting_persistence_spans
     public async Task Should_create_saga_spans_and_transaction_events()
     {
         var storage = new NonDurableStorage();
-        var persister = new NonDurableSagaPersister(storage, new NonDurableSagaPersisterSettings(new System.Text.Json.JsonSerializerOptions()));
+        var options = new NonDurableSagaOptions();
+        var persister = new NonDurableSagaPersister(storage, options);
         using var listener = new TestingActivityListener(NonDurablePersistenceTracing.ActivitySourceName);
         using var root = StartRootActivity();
         var session = new NonDurableSynchronizedStorageSession();
