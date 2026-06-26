@@ -13,6 +13,7 @@ sealed class NonDurableSubscriptionPersistence : Feature
     {
         var persistenceOptions = context.Settings.Get<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
+
         context.Services.AddSingleton(sp => new NonDurableSubscriptionStorage(sp.GetRequiredService<NonDurableStorage>()));
         context.Services.AddSingleton<ISubscriptionStorage>(sp => sp.GetRequiredService<NonDurableSubscriptionStorage>());
     }
