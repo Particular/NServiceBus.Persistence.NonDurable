@@ -19,7 +19,6 @@ sealed class NonDurableSagaPersistence : Feature
         NonDurablePersistenceOptions persistenceOptions = context.Settings.Get<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
 
-
         context.Services.AddSingleton(sp => new NonDurableSagaPersister(sp.GetRequiredService<NonDurableStorage>(), persistenceOptions.Saga));
         context.Services.AddSingleton<ISagaPersister>(sp => sp.GetRequiredService<NonDurableSagaPersister>());
     }

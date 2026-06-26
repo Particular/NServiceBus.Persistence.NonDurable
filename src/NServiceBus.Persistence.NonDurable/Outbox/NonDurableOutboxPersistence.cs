@@ -17,7 +17,7 @@ sealed class NonDurableOutboxPersistence : Feature
 
     protected override void Setup(FeatureConfigurationContext context)
     {
-        var persistenceOptions = context.Settings.GetOrDefault<NonDurablePersistenceOptions>();
+        var persistenceOptions = context.Settings.Get<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
 
         var endpointName = context.Settings.EndpointName();
