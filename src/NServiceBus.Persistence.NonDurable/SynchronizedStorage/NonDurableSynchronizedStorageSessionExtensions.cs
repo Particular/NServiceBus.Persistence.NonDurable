@@ -7,7 +7,7 @@ using Persistence.NonDurable;
 /// <summary>
 /// NonDurable persistence specific extension methods for <see cref="ISynchronizedStorageSession" />.
 /// </summary>
-public static class SynchronizedStorageSessionExtensions
+public static class NonDurableSynchronizedStorageSessionExtensions
 {
     /// <summary>
     /// Retrieves the NonDurable persistence session from the synchronized storage session.

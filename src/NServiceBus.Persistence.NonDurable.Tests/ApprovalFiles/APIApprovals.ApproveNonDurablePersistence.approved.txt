@@ -30,7 +30,7 @@ namespace NServiceBus
         public NonDurableStorageOptions() { }
         public System.TimeProvider? TimeProvider { get; init; }
     }
-    public static class SynchronizedStorageSessionExtensions
+    public static class NonDurableSynchronizedStorageSessionExtensions
     {
         public static NServiceBus.Persistence.NonDurable.INonDurableStorageSession NonDurablePersistenceSession(this NServiceBus.Persistence.ISynchronizedStorageSession session) { }
     }
