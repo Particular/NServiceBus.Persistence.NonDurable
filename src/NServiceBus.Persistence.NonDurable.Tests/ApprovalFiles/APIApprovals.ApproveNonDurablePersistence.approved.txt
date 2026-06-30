@@ -55,9 +55,10 @@ namespace NServiceBus.Testing
     public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession
     {
         public TestableNonDurableSynchronizedStorageSession() { }
+        public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableSagaOptions sagaOptions) { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage) { }
-        public void AddSaga<TSagaData>(TSagaData sagaData)
-            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage, NServiceBus.NonDurableSagaOptions sagaOptions) { }
+        public void AddSaga(NServiceBus.IContainSagaData sagaData) { }
         public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
         public TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
