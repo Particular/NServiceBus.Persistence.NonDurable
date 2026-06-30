@@ -198,8 +198,7 @@ class NonDurableSagaPersister : ISagaPersister
 
         // Custom finders may return saga data that was not loaded via Get, so no entry was
         // captured in the context. Fall back to the current live entry so the optimistic-
-        // concurrency compare still resolves against committed state at the commit
-        // linearization point. The normal Get -> Update path keeps the tighter read-time pin.
+        // concurrency compare still resolves against committed state
         if (sagas.TryGetValue(sagaDataId, out var liveEntry))
         {
             return liveEntry;
