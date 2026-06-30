@@ -25,29 +25,29 @@
 
             Assert.That(context.LoadedSagaData, Is.Not.Null);
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.StringArray, Is.EquivalentTo(StringArray));
                 Assert.That(context.LoadedSagaData.Collection, Is.EquivalentTo(Collection));
                 Assert.That(context.LoadedSagaData.List, Is.EquivalentTo(List));
-            });
+            }
 
             Assert.That(context.LoadedSagaData.IntStringDictionary, Has.Count.EqualTo(2));
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.IntStringDictionary[1], Is.EqualTo(IntStringDictionary[1]));
                 Assert.That(context.LoadedSagaData.IntStringDictionary[2], Is.EqualTo(IntStringDictionary[2]));
-            });
+            }
 
             Assert.That(context.LoadedSagaData.StringStringDictionary, Has.Count.EqualTo(2));
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.StringStringDictionary["1"], Is.EqualTo(StringStringDictionary["1"]));
                 Assert.That(context.LoadedSagaData.StringStringDictionary["2"], Is.EqualTo(StringStringDictionary["2"]));
-            });
+            }
 
             Assert.That(context.LoadedSagaData.StringObjectDictionary, Has.Count.EqualTo(2));
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj1"].Guid, Is.EqualTo(StringObjectDictionary["obj1"].Guid));
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj1"].Int, Is.EqualTo(StringObjectDictionary["obj1"].Int));
@@ -55,67 +55,67 @@
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].Guid, Is.EqualTo(StringObjectDictionary["obj2"].Guid));
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].Int, Is.EqualTo(StringObjectDictionary["obj2"].Int));
                 Assert.That(context.LoadedSagaData.StringObjectDictionary["obj2"].String, Is.EqualTo(StringObjectDictionary["obj2"].String));
-            });
+            }
 
             Assert.That(context.LoadedSagaData.ReadOnlyDictionary, Has.Count.EqualTo(2));
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.ReadOnlyDictionary["hello"], Is.EqualTo(ReadOnlyDictionary["hello"]));
                 Assert.That(context.LoadedSagaData.ReadOnlyDictionary["world"], Is.EqualTo(ReadOnlyDictionary["world"]));
-            });
+            }
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.DateTimeLocal, Is.EqualTo(DateTimeLocal));
                 Assert.That(context.LoadedSagaData.DateTimeLocal.Kind, Is.EqualTo(DateTimeLocal.Kind));
-            });
+            }
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.DateTimeUnspecified, Is.EqualTo(DateTimeUnspecified));
                 Assert.That(context.LoadedSagaData.DateTimeUnspecified.Kind, Is.EqualTo(DateTimeUnspecified.Kind));
-            });
+            }
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.DateTimeUtc, Is.EqualTo(DateTimeUtc));
                 Assert.That(context.LoadedSagaData.DateTimeUtc.Kind, Is.EqualTo(DateTimeUtc.Kind));
-            });
+            }
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(context.LoadedSagaData.DateTimeOffset, Is.EqualTo(DateTimeOffset));
                 Assert.That(context.LoadedSagaData.DateTimeOffset.Offset, Is.EqualTo(DateTimeOffset.Offset));
                 Assert.That(context.LoadedSagaData.DateTimeOffset.LocalDateTime, Is.EqualTo(DateTimeOffset.LocalDateTime));
-            });
+            }
         }
 
-        static string[] StringArray =
+        static readonly string[] StringArray =
         {
             "a",
             "b",
             "c"
         };
 
-        static Dictionary<int, string> IntStringDictionary = new Dictionary<int, string>
+        static readonly Dictionary<int, string> IntStringDictionary = new()
         {
             {1, "hello"},
             {2, "world"}
         };
 
-        static Dictionary<string, string> StringStringDictionary = new Dictionary<string, string>
+        static readonly Dictionary<string, string> StringStringDictionary = new()
         {
             {"1", "hello"},
             {"2", "world"}
         };
 
-        static IDictionary<int, string> IntStringIDictionary = new Dictionary<int, string>
+        static readonly IDictionary<int, string> IntStringIDictionary = new Dictionary<int, string>
         {
             {1, "hello"},
             {2, "interface world"}
         };
 
-        static Dictionary<string, SamplePoco> StringObjectDictionary = new Dictionary<string, SamplePoco>
+        static readonly Dictionary<string, SamplePoco> StringObjectDictionary = new()
         {
             {
                 "obj1", new SamplePoco
@@ -135,29 +135,29 @@
             }
         };
 
-        static ICollection<string> Collection =
+        static readonly ICollection<string> Collection =
         [
             "1",
             "2"
         ];
 
-        static IList<string> List =
+        static readonly IList<string> List =
         [
             "1",
             "2"
         ];
 
-        static IReadOnlyDictionary<string, int> ReadOnlyDictionary = new ReadOnlyDictionary<string, int>(new Dictionary<string, int>
+        static readonly IReadOnlyDictionary<string, int> ReadOnlyDictionary = new ReadOnlyDictionary<string, int>(new Dictionary<string, int>
         {
             {"hello", 11},
             {"world", 22}
         });
 
-        static DateTime DateTimeLocal = new DateTime(2010, 10, 10, 10, 10, 10, DateTimeKind.Local);
-        static DateTime DateTimeUnspecified = new DateTime(2010, 10, 10, 10, 10, 10, DateTimeKind.Unspecified);
-        static DateTime DateTimeUtc = new DateTime(2010, 10, 10, 10, 10, 10, DateTimeKind.Utc);
+        static readonly DateTime DateTimeLocal = new(2010, 10, 10, 10, 10, 10, DateTimeKind.Local);
+        static readonly DateTime DateTimeUnspecified = new(2010, 10, 10, 10, 10, 10, DateTimeKind.Unspecified);
+        static readonly DateTime DateTimeUtc = new(2010, 10, 10, 10, 10, 10, DateTimeKind.Utc);
 
-        static DateTimeOffset DateTimeOffset = new DateTimeOffset(2010, 10, 10, 10, 10, 10, TimeSpan.FromHours(10));
+        static readonly DateTimeOffset DateTimeOffset = new(2010, 10, 10, 10, 10, 10, TimeSpan.FromHours(10));
 
         public class SamplePoco
         {
@@ -166,13 +166,13 @@
             public Guid Guid { get; set; }
         }
 
-        class Context : ScenarioContext
+        public class Context : ScenarioContext
         {
             public SupportedFieldTypesSagaData LoadedSagaData { get; set; }
             public bool SagaDataLoaded { get; set; }
         }
 
-        class EndpointThatHostsASaga : EndpointConfigurationBuilder
+        public class EndpointThatHostsASaga : EndpointConfigurationBuilder
         {
             public EndpointThatHostsASaga() => EndpointSetup<DefaultServer>();
 
