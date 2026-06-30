@@ -11,6 +11,20 @@ static class NonDurableSagaDataProjection
         IReadOnlyContextBag context,
         Func<TSagaData, bool> predicate,
         CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        GetSagaData<TSagaData, Func<TSagaData, bool>>(
+            storage,
+            context,
+            predicate,
+            static (sagaData, predicate) => predicate(sagaData),
+            cancellationToken);
+
+    public static TSagaData? GetSagaData<TSagaData, TState>(
+        NonDurableStorage storage,
+        IReadOnlyContextBag context,
+        TState state,
+        Func<TSagaData, TState, bool> predicate,
+        CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData
     {
         ArgumentNullException.ThrowIfNull(storage);
@@ -32,7 +46,7 @@ static class NonDurableSagaDataProjection
             }
 
             var sagaData = (TSagaData)entry.GetSagaCopy();
-            if (!predicate(sagaData))
+            if (!predicate(sagaData, state))
             {
                 continue;
             }

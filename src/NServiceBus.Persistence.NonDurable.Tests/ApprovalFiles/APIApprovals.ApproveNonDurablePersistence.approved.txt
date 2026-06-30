@@ -41,6 +41,8 @@ namespace NServiceBus.Persistence.NonDurable
     {
         TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
+        TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
     }
     public static class NonDurableOutboxSettingsExtensions
     {
@@ -57,6 +59,8 @@ namespace NServiceBus.Testing
         public void AddSaga<TSagaData>(TSagaData sagaData)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
         public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        public TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
     }
 }

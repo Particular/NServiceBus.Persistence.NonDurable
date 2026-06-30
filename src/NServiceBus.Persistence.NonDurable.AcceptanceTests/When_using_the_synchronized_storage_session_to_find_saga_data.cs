@@ -81,9 +81,10 @@ public class When_using_the_synchronized_storage_session_to_find_saga_data : NSe
         public Task<ProcessExecutionSagaData> FindBy(ContinueWithServerTask message,
             ISynchronizedStorageSession storageSession, IReadOnlyContextBag context,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(storageSession.NonDurablePersistenceSession().GetSagaData<ProcessExecutionSagaData>(
+            Task.FromResult(storageSession.NonDurablePersistenceSession().GetSagaData<ProcessExecutionSagaData, Guid>(
                 context,
-                sagaData => sagaData.ServerTaskId == message.ServerTaskId,
+                message.ServerTaskId,
+                static (sagaData, serverTaskId) => sagaData.ServerTaskId == serverTaskId,
                 cancellationToken));
     }
 

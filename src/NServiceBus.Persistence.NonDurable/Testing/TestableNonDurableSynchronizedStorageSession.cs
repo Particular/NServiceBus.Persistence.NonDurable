@@ -38,4 +38,9 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
     public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
+
+    /// <inheritdoc />
+    public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
 }

@@ -118,15 +118,16 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
 
+    public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
+
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;
 
-    internal class EnlistmentNotification : IEnlistmentNotification
+    internal class EnlistmentNotification(NonDurableStorageTransaction transaction) : IEnlistmentNotification
     {
-        public TaskCompletionSource TransactionCompletionSource { get; } = new TaskCompletionSource();
-
-        public EnlistmentNotification(NonDurableStorageTransaction transaction) =>
-            this.transaction = transaction;
+        public TaskCompletionSource TransactionCompletionSource { get; } = new();
 
         public void Prepare(PreparingEnlistment preparingEnlistment)
         {
@@ -156,7 +157,5 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         }
 
         public void InDoubt(Enlistment enlistment) => enlistment.Done();
-
-        readonly NonDurableStorageTransaction transaction;
     }
 }
