@@ -209,7 +209,7 @@ class NonDurableSagaPersister : ISagaPersister
         }
     }
 
-    static void SetEntry(ContextBag context, Guid sagaId, SagaEntry value)
+    internal static void SetEntry(ContextBag context, Guid sagaId, SagaEntry value)
     {
         if (!context.TryGet(ContextKey, out Dictionary<Guid, SagaEntry>? entries))
         {

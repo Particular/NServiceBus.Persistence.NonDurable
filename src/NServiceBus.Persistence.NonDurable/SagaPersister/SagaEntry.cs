@@ -11,7 +11,9 @@ class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int vers
 
     public int Version { get; } = version;
 
-    public IContainSagaData GetSagaCopy() => (IContainSagaData)Deserialize(serializedSagaData, sagaDataType, serializerOptions);
+    public Type SagaDataType { get; } = sagaData.GetType();
+
+    public IContainSagaData GetSagaCopy() => (IContainSagaData)Deserialize(serializedSagaData, SagaDataType, serializerOptions);
 
     public SagaEntry UpdateTo(IContainSagaData newSagaData, JsonSerializerOptions newSerializerOptions)
         => new(newSagaData, CorrelationId, Version + 1, newSerializerOptions);
@@ -59,6 +61,5 @@ class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int vers
         Justification = "Only called when System.Text.Json reflection serialization is enabled.")]
     static object DeserializeWithReflection(string json, Type runtimeType, JsonSerializerOptions options) => JsonSerializer.Deserialize(json, runtimeType, options)!;
 
-    readonly Type sagaDataType = sagaData.GetType();
     readonly string serializedSagaData = Serialize(sagaData, sagaData.GetType(), serializerOptions);
 }

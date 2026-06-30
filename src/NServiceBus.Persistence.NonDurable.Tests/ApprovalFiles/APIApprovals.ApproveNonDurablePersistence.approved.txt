@@ -30,12 +30,38 @@ namespace NServiceBus
         public NonDurableStorageOptions() { }
         public System.TimeProvider? TimeProvider { get; init; }
     }
+    public static class NonDurableSynchronizedStorageSessionExtensions
+    {
+        public static NServiceBus.Persistence.NonDurable.INonDurableStorageSession NonDurablePersistenceSession(this NServiceBus.Persistence.ISynchronizedStorageSession session) { }
+    }
 }
 namespace NServiceBus.Persistence.NonDurable
 {
+    public interface INonDurableStorageSession
+    {
+        TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+        TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+    }
     public static class NonDurableOutboxSettingsExtensions
     {
         public static NServiceBus.Outbox.OutboxSettings FrequencyToRunDeduplicationDataCleanup(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
         public static NServiceBus.Outbox.OutboxSettings TimeToKeepDeduplicationData(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
+    }
+}
+namespace NServiceBus.Testing
+{
+    public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession
+    {
+        public TestableNonDurableSynchronizedStorageSession() { }
+        public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableSagaOptions sagaOptions) { }
+        public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage) { }
+        public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage, NServiceBus.NonDurableSagaOptions sagaOptions) { }
+        public void AddSaga(NServiceBus.IContainSagaData sagaData) { }
+        public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        public TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
     }
 }

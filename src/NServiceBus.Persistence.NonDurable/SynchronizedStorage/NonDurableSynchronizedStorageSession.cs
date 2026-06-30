@@ -10,8 +10,12 @@ using Outbox;
 using Persistence;
 using Transport;
 
-class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSession
+class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : ICompletableSynchronizedStorageSession, INonDurableStorageSession
 {
+    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedStorage)
+    {
+    }
+
     public NonDurableStorageTransaction? Transaction { get; private set; }
 
     public void Dispose()
@@ -21,7 +25,7 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
             // In the DTC path, the ambient transaction drives commit/rollback via
             // EnlistmentNotification — do not dispose activities here; they will be
             // disposed when the ambient transaction commits/rolls back. When we own
-            // the transaction and it wasn't committed, dispose tracked activities to
+            // the transaction, and it wasn't committed, dispose tracked activities to
             // avoid leaks (e.g. handler failure in the non-DTC path).
             if (ownsTransaction && !enlistedInAmbientTransaction)
             {
@@ -110,15 +114,20 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         Transaction.Enlist(state, apply, rollback, activity);
     }
 
+    public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
+
+    public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
+
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;
 
-    internal class EnlistmentNotification : IEnlistmentNotification
+    internal class EnlistmentNotification(NonDurableStorageTransaction transaction) : IEnlistmentNotification
     {
-        public TaskCompletionSource TransactionCompletionSource { get; } = new TaskCompletionSource();
-
-        public EnlistmentNotification(NonDurableStorageTransaction transaction) =>
-            this.transaction = transaction;
+        public TaskCompletionSource TransactionCompletionSource { get; } = new();
 
         public void Prepare(PreparingEnlistment preparingEnlistment)
         {
@@ -148,7 +157,5 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         }
 
         public void InDoubt(Enlistment enlistment) => enlistment.Done();
-
-        readonly NonDurableStorageTransaction transaction;
     }
 }
