@@ -49,10 +49,22 @@ public class When_emitting_persistence_spans
 
         using (Assert.EnterMultipleScope())
         {
+            // Span names are under test (part of public API)
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaSaveActivityName), Is.True);
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaGetByIdActivityName && Equals(a.GetTagItem("nservicebus.persistence.result"), "hit")), Is.True);
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaUpdateActivityName), Is.True);
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaCompleteActivityName), Is.True);
+
+            // Parent/child linkage — spans should be children of the root activity
+            Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaSaveActivityName && a.ParentId == root.Id), Is.True);
+            Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaGetByIdActivityName && a.ParentId == root.Id), Is.True);
+
+            // Status deferred to transaction commit (option b) — should be Ok after commit
+            Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaSaveActivityName && a.Status == ActivityStatusCode.Ok), Is.True);
+            Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaUpdateActivityName && a.Status == ActivityStatusCode.Ok), Is.True);
+            Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaCompleteActivityName && a.Status == ActivityStatusCode.Ok), Is.True);
+
+            // Transaction lifecycle events
             Assert.That(activities.Any(a => a.Events.Any(e => e.Name == "nondurable.persistence.transaction.enlisted")), Is.True);
             Assert.That(activities.Any(a => a.Events.Any(e => e.Name == "nondurable.persistence.transaction.committed")), Is.True);
         }
@@ -83,6 +95,9 @@ public class When_emitting_persistence_spans
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.OutboxStoreActivityName), Is.True);
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.OutboxGetActivityName && Equals(a.GetTagItem("nservicebus.persistence.result"), "hit")), Is.True);
             Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.OutboxSetAsDispatchedActivityName && a.Events.Any(e => e.Name == "nondurable.persistence.marked_dispatched")), Is.True);
+
+            // Store span status deferred to outbox transaction commit
+            Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.OutboxStoreActivityName && a.Status == ActivityStatusCode.Ok), Is.True);
         }
     }
 
@@ -119,7 +134,8 @@ public class When_emitting_persistence_spans
         var transaction = new NonDurableStorageTransaction();
         using var root = StartRootActivity();
 
-        transaction.Enlist(new object(), static _ => { });
+        // The activity is passed explicitly to Enlist (no Activity.Current reliance).
+        transaction.Enlist(new object(), static _ => { }, activity: root);
         transaction.Enlist(new InvalidOperationException("boom"), static state => throw state);
 
         Assert.Throws<InvalidOperationException>(() => transaction.Commit());
@@ -127,6 +143,29 @@ public class When_emitting_persistence_spans
         root.Stop();
 
         Assert.That(root.Events.Any(e => e.Name == "nondurable.persistence.transaction.rolled_back"), Is.True);
+    }
+
+    [Test]
+    public async Task Should_mark_enlisted_span_as_error_when_transaction_abandoned()
+    {
+        var persister = new NonDurableSagaPersister();
+        using var listener = new TestingActivityListener(NonDurablePersistenceTracing.ActivitySourceName);
+        using var root = StartRootActivity();
+        var session = new NonDurableSynchronizedStorageSession();
+        var context = new ContextBag();
+        var sagaData = new TestSagaData { Id = Guid.NewGuid(), Value = "first" };
+
+        // Open + Save enlists an activity, but do NOT call CompleteAsync.
+        // Disposing the session should dispose the activity with Error status.
+        await session.Open(context);
+        await persister.Save(sagaData, SagaCorrelationProperty.None, session, context);
+        session.Dispose();
+        root.Stop();
+
+        var activities = listener.CompletedFrom(NonDurablePersistenceTracing.ActivitySourceName);
+
+        Assert.That(activities.Any(a => a.OperationName == NonDurablePersistenceTracing.SagaSaveActivityName
+                                        && a.Status == ActivityStatusCode.Error), Is.True);
     }
 
     static Activity StartRootActivity()

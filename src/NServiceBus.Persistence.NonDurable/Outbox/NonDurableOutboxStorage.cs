@@ -43,24 +43,33 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
 
     public Task Store(OutboxMessage message, IOutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = default)
     {
-        using var activity = NonDurablePersistenceTracing.StartOutboxStore(message.MessageId, message.TransportOperations.Length);
-        var storageKey = OutboxStorageKey(message.MessageId);
-        var tx = (NonDurableOutboxTransaction)transaction;
-        var storedAt = storage.TimeProvider.GetUtcNow().UtcDateTime;
-        tx.Enlist(
-            new StoreOperationState(Storage, storageKey, message.MessageId, message.TransportOperations.Select(CopyOperation).ToArray(), storedAt),
-            static state =>
-            {
-                if (!state.Storage.TryAdd(state.StorageKey, new StoredOutboxMessage(state.MessageId, state.TransportOperations) { StoredAt = state.StoredAt }))
+        var activity = NonDurablePersistenceTracing.StartOutboxStore(message.MessageId, message.TransportOperations.Length);
+        try
+        {
+            var storageKey = OutboxStorageKey(message.MessageId);
+            var tx = (NonDurableOutboxTransaction)transaction;
+            var storedAt = storage.TimeProvider.GetUtcNow().UtcDateTime;
+            tx.Enlist(
+                new StoreOperationState(Storage, storageKey, message.MessageId, message.TransportOperations.Select(CopyOperation).ToArray(), storedAt),
+                static state =>
                 {
-                    throw new Exception($"Outbox message with id '{state.MessageId}' is already present in storage.");
-                }
-            },
-            static state => state.Storage.TryRemove(state.StorageKey, out _));
-        NonDurablePersistenceTracing.AddStagedEvent(activity);
-        NonDurablePersistenceTracing.MarkSuccess(activity);
+                    if (!state.Storage.TryAdd(state.StorageKey, new StoredOutboxMessage(state.MessageId, state.TransportOperations) { StoredAt = state.StoredAt }))
+                    {
+                        throw new Exception($"Outbox message with id '{state.MessageId}' is already present in storage.");
+                    }
+                },
+                static state => state.Storage.TryRemove(state.StorageKey, out _),
+                activity);
+            NonDurablePersistenceTracing.AddStagedEvent(activity);
 
-        return Task.CompletedTask;
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            NonDurablePersistenceTracing.MarkError(activity, ex, exceptionEscaped: true);
+            activity?.Dispose();
+            throw;
+        }
     }
 
     public Task SetAsDispatched(string messageId, ContextBag context, CancellationToken cancellationToken = default)

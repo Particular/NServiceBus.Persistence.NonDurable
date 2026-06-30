@@ -30,45 +30,54 @@ class NonDurableSagaPersister : ISagaPersister
 
     public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
     {
-        using var activity = NonDurablePersistenceTracing.StartSagaSave(sagaData.Id);
-        var correlationId = correlationProperty != SagaCorrelationProperty.None
-            ? new CorrelationId(sagaData.GetType(), correlationProperty)
-            : NoCorrelationId;
-        var entry = new SagaEntry(sagaData, correlationId, version: 1, options.JsonSerializerOptions);
+        var activity = NonDurablePersistenceTracing.StartSagaSave(sagaData.Id);
+        try
+        {
+            var correlationId = correlationProperty != SagaCorrelationProperty.None
+                ? new CorrelationId(sagaData.GetType(), correlationProperty)
+                : NoCorrelationId;
+            var entry = new SagaEntry(sagaData, correlationId, version: 1, options.JsonSerializerOptions);
 
-        ((NonDurableSynchronizedStorageSession)session).Enlist(
-            new SaveOperationState(sagas, byCorrelationId, sagaData.Id, correlationId, entry),
-            static state =>
-            {
-                if (!state.CorrelationId.Equals(NoCorrelationId)
-                    && !state.ByCorrelationId.TryAdd(state.CorrelationId, state.SagaId))
+            ((NonDurableSynchronizedStorageSession)session).Enlist(
+                new SaveOperationState(sagas, byCorrelationId, sagaData.Id, correlationId, entry),
+                static state =>
                 {
-                    throw new InvalidOperationException($"The saga with the correlation id already exists");
-                }
+                    if (!state.CorrelationId.Equals(NoCorrelationId)
+                        && !state.ByCorrelationId.TryAdd(state.CorrelationId, state.SagaId))
+                    {
+                        throw new InvalidOperationException($"The saga with the correlation id already exists");
+                    }
 
-                if (!state.Sagas.TryAdd(state.SagaId, state.Entry))
+                    if (!state.Sagas.TryAdd(state.SagaId, state.Entry))
+                    {
+                        if (!state.CorrelationId.Equals(NoCorrelationId))
+                        {
+                            state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.CorrelationId, state.SagaId));
+                        }
+
+                        throw new Exception("A saga with this identifier already exists. This should never happen as saga identifiers are meant to be unique.");
+                    }
+                },
+                static state =>
                 {
+                    state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.Entry));
+
                     if (!state.CorrelationId.Equals(NoCorrelationId))
                     {
                         state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.CorrelationId, state.SagaId));
                     }
+                },
+                activity);
+            NonDurablePersistenceTracing.AddStagedEvent(activity);
 
-                    throw new Exception("A saga with this identifier already exists. This should never happen as saga identifiers are meant to be unique.");
-                }
-            },
-            static state =>
-            {
-                state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.Entry));
-
-                if (!state.CorrelationId.Equals(NoCorrelationId))
-                {
-                    state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.CorrelationId, state.SagaId));
-                }
-            });
-        NonDurablePersistenceTracing.AddStagedEvent(activity);
-        NonDurablePersistenceTracing.MarkSuccess(activity);
-
-        return Task.CompletedTask;
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            NonDurablePersistenceTracing.MarkError(activity, ex, exceptionEscaped: true);
+            activity?.Dispose();
+            throw;
+        }
     }
 
     public Task<TSagaData> Get<TSagaData>(Guid sagaId, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
@@ -115,68 +124,86 @@ class NonDurableSagaPersister : ISagaPersister
 
     public Task Update(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
     {
-        using var activity = NonDurablePersistenceTracing.StartSagaUpdate(sagaData.Id);
-        var entry = GetEntry(context, sagaData.Id);
-        var updatedEntry = entry.UpdateTo(sagaData, options.JsonSerializerOptions);
+        var activity = NonDurablePersistenceTracing.StartSagaUpdate(sagaData.Id);
+        try
+        {
+            var entry = GetEntry(context, sagaData.Id);
+            var updatedEntry = entry.UpdateTo(sagaData, options.JsonSerializerOptions);
 
-        ((NonDurableSynchronizedStorageSession)session).Enlist(
-            new UpdateOperationState(sagas, sagaData.Id, entry, updatedEntry),
-            static state =>
-            {
-                if (!state.Sagas.TryUpdate(state.SagaId, state.UpdatedEntry, state.Entry))
+            ((NonDurableSynchronizedStorageSession)session).Enlist(
+                new UpdateOperationState(sagas, sagaData.Id, entry, updatedEntry),
+                static state =>
                 {
-                    throw new Exception($"NonDurableSagaPersister concurrency violation: saga entity Id[{state.SagaId}] was modified by another process.");
-                }
-            },
-            static state =>
-            {
-                // Restore the original entry by reading the live value and swapping it back.
-                // Comparing against the live value (rather than the captured updated entry) keeps
-                // rollback correct under DTC two-phase commit, where the prepare and rollback
-                // phases are driven by the distributed transaction coordinator on a separate thread.
-                if (state.Sagas.TryGetValue(state.SagaId, out var currentEntry))
+                    if (!state.Sagas.TryUpdate(state.SagaId, state.UpdatedEntry, state.Entry))
+                    {
+                        throw new Exception($"NonDurableSagaPersister concurrency violation: saga entity Id[{state.SagaId}] was modified by another process.");
+                    }
+                },
+                static state =>
                 {
-                    state.Sagas.TryUpdate(state.SagaId, state.Entry, currentEntry);
-                }
-            });
-        NonDurablePersistenceTracing.AddStagedEvent(activity);
-        NonDurablePersistenceTracing.MarkSuccess(activity);
+                    // Restore the original entry by reading the live value and swapping it back.
+                    // Comparing against the live value (rather than the captured updated entry) keeps
+                    // rollback correct under DTC two-phase commit, where the prepare and rollback
+                    // phases are driven by the distributed transaction coordinator on a separate thread.
+                    if (state.Sagas.TryGetValue(state.SagaId, out var currentEntry))
+                    {
+                        state.Sagas.TryUpdate(state.SagaId, state.Entry, currentEntry);
+                    }
+                },
+                activity);
+            NonDurablePersistenceTracing.AddStagedEvent(activity);
 
-        return Task.CompletedTask;
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            NonDurablePersistenceTracing.MarkError(activity, ex, exceptionEscaped: true);
+            activity?.Dispose();
+            throw;
+        }
     }
 
     public Task Complete(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
     {
-        using var activity = NonDurablePersistenceTracing.StartSagaComplete(sagaData.Id);
-        var entry = GetEntry(context, sagaData.Id);
+        var activity = NonDurablePersistenceTracing.StartSagaComplete(sagaData.Id);
+        try
+        {
+            var entry = GetEntry(context, sagaData.Id);
 
-        ((NonDurableSynchronizedStorageSession)session).Enlist(
-            new CompleteOperationState(sagas, byCorrelationId, sagaData.Id, entry),
-            static state =>
-            {
-                if (!state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.Entry)))
+            ((NonDurableSynchronizedStorageSession)session).Enlist(
+                new CompleteOperationState(sagas, byCorrelationId, sagaData.Id, entry),
+                static state =>
                 {
-                    throw new Exception("Saga can't be completed as it was updated by another process.");
-                }
+                    if (!state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.Entry)))
+                    {
+                        throw new Exception("Saga can't be completed as it was updated by another process.");
+                    }
 
-                if (!state.Entry.CorrelationId.Equals(NoCorrelationId))
+                    if (!state.Entry.CorrelationId.Equals(NoCorrelationId))
+                    {
+                        state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.Entry.CorrelationId, state.SagaId));
+                    }
+                },
+                static state =>
                 {
-                    state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.Entry.CorrelationId, state.SagaId));
-                }
-            },
-            static state =>
-            {
-                state.Sagas.TryAdd(state.SagaId, state.Entry);
+                    state.Sagas.TryAdd(state.SagaId, state.Entry);
 
-                if (!state.Entry.CorrelationId.Equals(NoCorrelationId))
-                {
-                    state.ByCorrelationId.TryAdd(state.Entry.CorrelationId, state.SagaId);
-                }
-            });
-        NonDurablePersistenceTracing.AddStagedEvent(activity);
-        NonDurablePersistenceTracing.MarkSuccess(activity);
+                    if (!state.Entry.CorrelationId.Equals(NoCorrelationId))
+                    {
+                        state.ByCorrelationId.TryAdd(state.Entry.CorrelationId, state.SagaId);
+                    }
+                },
+                activity);
+            NonDurablePersistenceTracing.AddStagedEvent(activity);
 
-        return Task.CompletedTask;
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            NonDurablePersistenceTracing.MarkError(activity, ex, exceptionEscaped: true);
+            activity?.Dispose();
+            throw;
+        }
     }
 
     static void SetEntry(ContextBag context, Guid sagaId, SagaEntry value)

@@ -1,6 +1,7 @@
 namespace NServiceBus.Persistence.NonDurable;
 
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Outbox;
@@ -9,12 +10,12 @@ class NonDurableOutboxTransaction : IOutboxTransaction
 {
     public NonDurableStorageTransaction? Transaction { get; private set; } = new();
 
-    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null)
+    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null, Activity? activity = null)
     {
         ArgumentNullException.ThrowIfNull(apply);
         ArgumentNullException.ThrowIfNull(Transaction);
 
-        Transaction.Enlist(state, apply, rollback);
+        Transaction.Enlist(state, apply, rollback, activity);
     }
 
     public Task Commit(CancellationToken cancellationToken = default)
@@ -25,23 +26,16 @@ class NonDurableOutboxTransaction : IOutboxTransaction
 
     public void Dispose()
     {
-        if (Transaction is null)
+        if (Transaction is { } tx)
         {
-            return;
+            tx.DisposeTrackedActivities();
+            Transaction = null;
         }
-
-        Transaction = null;
     }
 
     public ValueTask DisposeAsync()
     {
-        if (Transaction is null)
-        {
-            return default;
-        }
-
-        Transaction = null;
-
+        Dispose();
         return default;
     }
 }

@@ -1,6 +1,7 @@
 namespace NServiceBus.Persistence.NonDurable;
 
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -15,22 +16,25 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
 
     public void Dispose()
     {
-        if (Transaction is null)
+        if (Transaction is { } tx)
         {
-            return;
-        }
+            // In the DTC path, the ambient transaction drives commit/rollback via
+            // EnlistmentNotification — do not dispose activities here; they will be
+            // disposed when the ambient transaction commits/rolls back. When we own
+            // the transaction and it wasn't committed, dispose tracked activities to
+            // avoid leaks (e.g. handler failure in the non-DTC path).
+            if (ownsTransaction && !enlistedInAmbientTransaction)
+            {
+                tx.DisposeTrackedActivities();
+            }
 
-        Transaction = null;
+            Transaction = null;
+        }
     }
 
     public ValueTask DisposeAsync()
     {
-        if (Transaction is null)
-        {
-            return default;
-        }
-
-        Transaction = null;
+        Dispose();
         return default;
     }
 
@@ -99,11 +103,11 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         return Task.CompletedTask;
     }
 
-    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null)
+    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null, Activity? activity = null)
     {
         ArgumentNullException.ThrowIfNull(apply);
         ArgumentNullException.ThrowIfNull(Transaction);
-        Transaction.Enlist(state, apply, rollback);
+        Transaction.Enlist(state, apply, rollback, activity);
     }
 
     bool ownsTransaction;
