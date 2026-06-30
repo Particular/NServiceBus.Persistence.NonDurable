@@ -189,15 +189,21 @@ class NonDurableSagaPersister : ISagaPersister
         entries[sagaId] = value;
     }
 
-    static SagaEntry GetEntry(ContextBag context, Guid sagaDataId)
+    SagaEntry GetEntry(ContextBag context, Guid sagaDataId)
     {
-        if (context.TryGet(ContextKey, out Dictionary<Guid, SagaEntry>? entries))
+        if (context.TryGet(ContextKey, out Dictionary<Guid, SagaEntry>? entries) && entries.TryGetValue(sagaDataId, out var entry))
         {
-            if (entries.TryGetValue(sagaDataId, out var entry))
-            {
-                return entry;
-            }
+            return entry;
         }
+
+        // Custom finders may return saga data that was not loaded via Get, so no entry was
+        // captured in the context. Fall back to the current live entry so the optimistic-
+        // concurrency compare still resolves against committed state
+        if (sagas.TryGetValue(sagaDataId, out var liveEntry))
+        {
+            return liveEntry;
+        }
+
         throw new Exception("The saga should be retrieved with Get method before it's updated.");
     }
 
