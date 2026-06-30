@@ -43,6 +43,7 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
 
     public Task Store(OutboxMessage message, IOutboxTransaction transaction, ContextBag context, CancellationToken cancellationToken = default)
     {
+        // Disposal must be deferred until the transaction completes or is disposed
         var activity = NonDurablePersistenceTracing.StartOutboxStore(message.MessageId, message.TransportOperations.Length);
         try
         {

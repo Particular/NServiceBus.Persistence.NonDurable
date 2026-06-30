@@ -30,6 +30,7 @@ class NonDurableSagaPersister : ISagaPersister
 
     public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
     {
+        // Disposal must be deferred until the transaction completes or is disposed
         var activity = NonDurablePersistenceTracing.StartSagaSave(sagaData.Id);
         try
         {
@@ -124,6 +125,7 @@ class NonDurableSagaPersister : ISagaPersister
 
     public Task Update(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
     {
+        // Disposal must be deferred until the transaction completes or is disposed
         var activity = NonDurablePersistenceTracing.StartSagaUpdate(sagaData.Id);
         try
         {
@@ -165,6 +167,7 @@ class NonDurableSagaPersister : ISagaPersister
 
     public Task Complete(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
     {
+        // Disposal must be deferred until the transaction completes or is disposed
         var activity = NonDurablePersistenceTracing.StartSagaComplete(sagaData.Id);
         try
         {
