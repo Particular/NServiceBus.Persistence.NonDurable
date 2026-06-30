@@ -8,7 +8,7 @@ using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
 static class NonDurablePersistenceTracing
 {
-    public const string ActivitySourceName = "NServiceBus.NonDurable";
+    public const string ActivitySourceName = "NServiceBus.Persistence.NonDurable";
 
     public const string SagaGetByIdActivityName = "NServiceBus.NonDurable.Persistence.Saga.GetById";
     public const string SagaGetByPropertyActivityName = "NServiceBus.NonDurable.Persistence.Saga.GetByProperty";
