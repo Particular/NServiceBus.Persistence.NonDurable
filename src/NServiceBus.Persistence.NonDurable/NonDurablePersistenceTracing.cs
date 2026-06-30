@@ -1,14 +1,13 @@
 namespace NServiceBus;
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using Unicast.Subscriptions;
 using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
 static class NonDurablePersistenceTracing
 {
-    public const string ActivitySourceName = "NServiceBus.NonDurable";
+    public const string ActivitySourceName = "NServiceBus.Persistence.NonDurable";
 
     public const string SagaGetByIdActivityName = "NServiceBus.NonDurable.Persistence.Saga.GetById";
     public const string SagaGetByPropertyActivityName = "NServiceBus.NonDurable.Persistence.Saga.GetByProperty";
@@ -57,102 +56,198 @@ static class NonDurablePersistenceTracing
 
     public static bool HasListeners() => activitySource.HasListeners();
 
-    public static Activity? StartSagaGetById(Guid sagaId) => StartActivity(
-        SagaGetByIdActivityName,
-        SagaType,
-        "get",
-        "saga",
-        new TagList
+    public static Activity? StartSagaGetById(Guid sagaId)
+    {
+        if (!activitySource.HasListeners())
         {
-            { LookupTag, "id" },
-            { SagaIdTag, sagaId.ToString() }
-        });
+            return null;
+        }
 
-    public static Activity? StartSagaGetByProperty(Type sagaType, string propertyName, object propertyValue) => StartActivity(
-        SagaGetByPropertyActivityName,
-        SagaType,
-        "get",
-        "saga",
-        new TagList
+        return StartActivity(
+            SagaGetByIdActivityName,
+            SagaType,
+            "get",
+            "saga",
+            new TagList
+            {
+                { LookupTag, "id" },
+                { SagaIdTag, sagaId.ToString() }
+            });
+    }
+
+    public static Activity? StartSagaGetByProperty(Type sagaType, string propertyName, object propertyValue)
+    {
+        if (!activitySource.HasListeners())
         {
-            { LookupTag, propertyName },
-            { MessageTypeTag, sagaType.FullName },
-            { ResultTag, propertyValue?.ToString() }
-        });
+            return null;
+        }
 
-    public static Activity? StartSagaSave(Guid sagaId) => StartActivity(
-        SagaSaveActivityName,
-        SagaType,
-        "save",
-        "saga",
-        new TagList { { SagaIdTag, sagaId.ToString() } });
+        return StartActivity(
+            SagaGetByPropertyActivityName,
+            SagaType,
+            "get",
+            "saga",
+            new TagList
+            {
+                { LookupTag, propertyName },
+                { MessageTypeTag, sagaType.FullName },
+                { ResultTag, propertyValue?.ToString() }
+            });
+    }
 
-    public static Activity? StartSagaUpdate(Guid sagaId) => StartActivity(
-        SagaUpdateActivityName,
-        SagaType,
-        "update",
-        "saga",
-        new TagList { { SagaIdTag, sagaId.ToString() } });
-
-    public static Activity? StartSagaComplete(Guid sagaId) => StartActivity(
-        SagaCompleteActivityName,
-        SagaType,
-        "complete",
-        "saga",
-        new TagList { { SagaIdTag, sagaId.ToString() } });
-
-    public static Activity? StartOutboxBeginTransaction() => StartActivity(
-        OutboxBeginTransactionActivityName,
-        OutboxType,
-        "begin_transaction",
-        "outbox",
-        []);
-
-    public static Activity? StartOutboxGet(string messageId) => StartActivity(
-        OutboxGetActivityName,
-        OutboxType,
-        "get",
-        "outbox",
-        new TagList { { OutboxMessageIdTag, messageId } });
-
-    public static Activity? StartOutboxStore(string messageId, int operationCount) => StartActivity(
-        OutboxStoreActivityName,
-        OutboxType,
-        "store",
-        "outbox",
-        new TagList
+    public static Activity? StartSagaSave(Guid sagaId)
+    {
+        if (!activitySource.HasListeners())
         {
-            { OutboxMessageIdTag, messageId },
-            { CountTag, operationCount }
-        });
+            return null;
+        }
 
-    public static Activity? StartOutboxSetAsDispatched(string messageId) => StartActivity(
-        OutboxSetAsDispatchedActivityName,
-        OutboxType,
-        "set_dispatched",
-        "outbox",
-        new TagList { { OutboxMessageIdTag, messageId } });
+        return StartActivity(
+            SagaSaveActivityName,
+            SagaType,
+            "save",
+            "saga",
+            new TagList { { SagaIdTag, sagaId.ToString() } });
+    }
 
-    public static Activity? StartSubscriptionSubscribe(Subscriber subscriber, MessageType messageType) => StartActivity(
-        SubscriptionSubscribeActivityName,
-        SubscriptionType,
-        "subscribe",
-        "subscription",
-        CreateSubscriptionTags(subscriber, messageType));
+    public static Activity? StartSagaUpdate(Guid sagaId)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
 
-    public static Activity? StartSubscriptionUnsubscribe(Subscriber subscriber, MessageType messageType) => StartActivity(
-        SubscriptionUnsubscribeActivityName,
-        SubscriptionType,
-        "unsubscribe",
-        "subscription",
-        CreateSubscriptionTags(subscriber, messageType));
+        return StartActivity(
+            SagaUpdateActivityName,
+            SagaType,
+            "update",
+            "saga",
+            new TagList { { SagaIdTag, sagaId.ToString() } });
+    }
 
-    public static Activity? StartGetSubscribers(int messageTypesCount) => StartActivity(
-        SubscriptionGetSubscribersActivityName,
-        SubscriptionType,
-        "get_subscribers",
-        "subscription",
-        new TagList { { CountTag, messageTypesCount } });
+    public static Activity? StartSagaComplete(Guid sagaId)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            SagaCompleteActivityName,
+            SagaType,
+            "complete",
+            "saga",
+            new TagList { { SagaIdTag, sagaId.ToString() } });
+    }
+
+    public static Activity? StartOutboxBeginTransaction()
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            OutboxBeginTransactionActivityName,
+            OutboxType,
+            "begin_transaction",
+            "outbox",
+            []);
+    }
+
+    public static Activity? StartOutboxGet(string messageId)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            OutboxGetActivityName,
+            OutboxType,
+            "get",
+            "outbox",
+            new TagList { { OutboxMessageIdTag, messageId } });
+    }
+
+    public static Activity? StartOutboxStore(string messageId, int operationCount)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            OutboxStoreActivityName,
+            OutboxType,
+            "store",
+            "outbox",
+            new TagList
+            {
+                { OutboxMessageIdTag, messageId },
+                { CountTag, operationCount }
+            });
+    }
+
+    public static Activity? StartOutboxSetAsDispatched(string messageId)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            OutboxSetAsDispatchedActivityName,
+            OutboxType,
+            "set_dispatched",
+            "outbox",
+            new TagList { { OutboxMessageIdTag, messageId } });
+    }
+
+    public static Activity? StartSubscriptionSubscribe(Subscriber subscriber, MessageType messageType)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            SubscriptionSubscribeActivityName,
+            SubscriptionType,
+            "subscribe",
+            "subscription",
+            CreateSubscriptionTags(subscriber, messageType));
+    }
+
+    public static Activity? StartSubscriptionUnsubscribe(Subscriber subscriber, MessageType messageType)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            SubscriptionUnsubscribeActivityName,
+            SubscriptionType,
+            "unsubscribe",
+            "subscription",
+            CreateSubscriptionTags(subscriber, messageType));
+    }
+
+    public static Activity? StartGetSubscribers(int messageTypesCount)
+    {
+        if (!activitySource.HasListeners())
+        {
+            return null;
+        }
+
+        return StartActivity(
+            SubscriptionGetSubscribersActivityName,
+            SubscriptionType,
+            "get_subscribers",
+            "subscription",
+            new TagList { { CountTag, messageTypesCount } });
+    }
 
     public static void AddTransactionEnlistedEvent(Activity? activity, string operationType)
     {
@@ -229,10 +324,9 @@ static class NonDurablePersistenceTracing
         }
 
         activity.SetStatus(ActivityStatusCode.Ok);
-        activity.SetTag("otel.status_code", "OK");
     }
 
-    public static void MarkError(Activity? activity, Exception ex, bool exceptionEscaped = true)
+    public static void MarkError(Activity? activity, Exception ex, bool exceptionEscaped)
     {
         if (activity == null)
         {
@@ -240,16 +334,33 @@ static class NonDurablePersistenceTracing
         }
 
         activity.SetStatus(ActivityStatusCode.Error, ex.Message);
-        activity.SetTag("otel.status_code", "ERROR");
-        activity.SetTag("otel.status_description", ex.Message);
-        activity.SetTag(ErrorTypeTag, ex.GetType().Name);
-        activity.AddEvent(new ActivityEvent("exception", DateTimeOffset.UtcNow,
-        [
-            new KeyValuePair<string, object?>("exception.escaped", exceptionEscaped),
-            new KeyValuePair<string, object?>("exception.type", ex.GetType().FullName),
-            new KeyValuePair<string, object?>("exception.message", ex.Message),
-            new KeyValuePair<string, object?>("exception.stacktrace", ex.ToString())
-        ]));
+
+        // Keep the cheap exception attributes always; the stacktrace (ex.ToString()) can be
+        // large, so only materialize it when the span is fully recorded.
+        var exceptionTags = new ActivityTagsCollection
+        {
+            ["exception.escaped"] = exceptionEscaped,
+            ["exception.type"] = ex.GetType().FullName,
+            ["exception.message"] = ex.Message,
+        };
+
+        if (activity.IsAllDataRequested)
+        {
+            exceptionTags["exception.stacktrace"] = ex.ToString();
+        }
+
+        activity.AddEvent(new ActivityEvent("exception", DateTimeOffset.UtcNow, exceptionTags));
+        activity.SetTag(ErrorTypeTag, ex.GetType().FullName);
+    }
+
+    public static void MarkError(Activity? activity, string description)
+    {
+        if (activity == null)
+        {
+            return;
+        }
+
+        activity.SetStatus(ActivityStatusCode.Error, description);
     }
 
     static Activity? StartActivity(string activityName, string persistenceType, string operation, string entity, TagList additionalTags)
@@ -278,7 +389,7 @@ static class NonDurablePersistenceTracing
             return null;
         }
 
-        activity.DisplayName = operation;
+        activity.DisplayName = $"{entity} {operation}";
         activity.Start();
         return activity;
     }

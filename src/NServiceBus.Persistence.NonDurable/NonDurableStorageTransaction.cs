@@ -7,7 +7,7 @@ using System.Threading;
 
 class NonDurableStorageTransaction
 {
-    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null)
+    public void Enlist<TState>(TState state, Action<TState> apply, Action<TState>? rollback = null, Activity? activity = null)
     {
         ArgumentNullException.ThrowIfNull(apply);
         var operation = new TransactionOperation<TState>(state, apply, rollback);
@@ -17,7 +17,15 @@ class NonDurableStorageTransaction
             rollbackOperations.Add(operation);
         }
 
-        tracingActivity ??= Activity.Current;
+        // The activity is passed explicitly by the persister (the span owner), never
+        // captured from Activity.Current — user code can replace Activity.Current via
+        // AsyncLocal, so relying on it would capture the wrong span.
+        if (activity is not null)
+        {
+            enlistedActivities.Add(activity);
+        }
+
+        tracingActivity ??= activity;
         NonDurablePersistenceTracing.AddTransactionEnlistedEvent(tracingActivity, typeof(TState).Name);
     }
 
@@ -41,12 +49,14 @@ class NonDurableStorageTransaction
 
             Volatile.Write(ref committed, 1);
             NonDurablePersistenceTracing.AddTransactionCommittedEvent(tracingActivity, operationCount);
+            CompleteEnlistedActivities(success: true);
         }
-        catch
+        catch (Exception ex)
         {
             RollbackAppliedOperations();
 
             NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, operationCount);
+            CompleteEnlistedActivities(success: false, exception: ex);
             throw;
         }
     }
@@ -66,7 +76,59 @@ class NonDurableStorageTransaction
         }
 
         NonDurablePersistenceTracing.AddTransactionRolledBackEvent(tracingActivity, operationCount);
+        CompleteEnlistedActivities(success: false);
         enlistedOperations.Clear();
+    }
+
+    // Called by NonDurableSynchronizedStorageSession.Dispose / NonDurableOutboxTransaction.Dispose
+    // when the transaction was abandoned without Commit or Rollback (e.g. handler failure in the
+    // non-DTC path). Disposes tracked activities to avoid leaks. In the DTC path, the ambient
+    // transaction drives Commit/Rollback via EnlistmentNotification, so this is not called for
+    // enlisted-in-ambient sessions (the session checks enlistedInAmbientTransaction before calling).
+    internal void DisposeTrackedActivities()
+    {
+        if (enlistedActivities.Count == 0)
+        {
+            return;
+        }
+
+        // Transaction was abandoned without commit — mark activities as error and dispose.
+        foreach (var activity in enlistedActivities)
+        {
+            NonDurablePersistenceTracing.MarkError(activity, "Transaction abandoned without commit");
+            activity.Dispose();
+        }
+
+        enlistedActivities.Clear();
+    }
+
+    void CompleteEnlistedActivities(bool success, Exception? exception = null)
+    {
+        if (enlistedActivities.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var activity in enlistedActivities)
+        {
+            if (success)
+            {
+                NonDurablePersistenceTracing.MarkSuccess(activity);
+            }
+            else if (exception is not null)
+            {
+                // The exception escaped the span boundary — Commit rethrows after this.
+                NonDurablePersistenceTracing.MarkError(activity, exception, exceptionEscaped: true);
+            }
+            else
+            {
+                NonDurablePersistenceTracing.MarkError(activity, "Transaction rolled back");
+            }
+
+            activity.Dispose();
+        }
+
+        enlistedActivities.Clear();
     }
 
     void RollbackAppliedOperations()
@@ -80,6 +142,7 @@ class NonDurableStorageTransaction
     readonly List<ITransactionOperation> enlistedOperations = [];
     readonly List<ITransactionOperation> rollbackOperations = [];
     readonly Stack<ITransactionOperation> appliedOperations = [];
+    readonly List<Activity> enlistedActivities = [];
     Activity? tracingActivity;
     int committed;
     int rollbackWasCalled;
