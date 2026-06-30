@@ -14,7 +14,7 @@ public partial class PersistenceTestsConfiguration
 
     public bool SupportsOutbox => true;
 
-    public bool SupportsFinders => false;
+    public bool SupportsFinders => true;
 
     public bool SupportsPessimisticConcurrency => false;
 

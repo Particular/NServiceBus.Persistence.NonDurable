@@ -10,7 +10,7 @@ public class NonDurablePersistence : PersistenceDefinition, IPersistenceDefiniti
     NonDurablePersistence()
     {
         Defaults(s => s.SetDefault(new NonDurablePersistenceOptions()));
-        Supports<StorageType.Sagas, Features.NonDurableSagaPersistence>();
+        Supports<StorageType.Sagas, Features.NonDurableSagaPersistence>(new StorageType.SagasOptions { SupportsFinders = true });
         Supports<StorageType.Subscriptions, Features.NonDurableSubscriptionPersistence>();
         Supports<StorageType.Outbox, Features.NonDurableOutboxPersistence>();
     }
