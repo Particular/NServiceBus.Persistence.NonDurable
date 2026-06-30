@@ -10,5 +10,10 @@ sealed class NonDurableTransactionalStorageFeature : Feature
     public NonDurableTransactionalStorageFeature() => DependsOn<SynchronizedStorage>();
 
     protected override void Setup(FeatureConfigurationContext context)
-        => context.Services.AddScoped<ICompletableSynchronizedStorageSession, NonDurableSynchronizedStorageSession>();
+    {
+        NonDurablePersistenceOptions persistenceOptions = context.Settings.Get<NonDurablePersistenceOptions>();
+        NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
+
+        context.Services.AddScoped<ICompletableSynchronizedStorageSession>(sp => new NonDurableSynchronizedStorageSession(sp.GetRequiredService<NonDurableStorage>()));
+    }
 }

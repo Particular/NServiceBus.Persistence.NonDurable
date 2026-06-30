@@ -1,11 +1,9 @@
 namespace NServiceBus.Persistence.NonDurable.AcceptanceTests;
 
 using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using AcceptanceTesting;
-using Microsoft.Extensions.DependencyInjection;
 using NServiceBus;
 using NServiceBus.AcceptanceTests;
 using NServiceBus.AcceptanceTests.EndpointTemplates;
@@ -14,25 +12,14 @@ using NServiceBus.Persistence;
 using NServiceBus.Sagas;
 using NUnit.Framework;
 
-// This test keeps the explicit ServerTaskId -> saga id index to verify that custom
-// finders can still use their own storage and delegate to the persister's by-id Get
-// (which captures the entry for the optimistic-concurrency check). See
-// When_using_the_synchronized_storage_session_to_find_saga_data for the projection-based
-// finder that queries NonDurable saga data through the synchronized storage session.
-public class When_using_a_custom_saga_finder : NServiceBusAcceptanceTest
+public class When_using_the_synchronized_storage_session_to_find_saga_data : NServiceBusAcceptanceTest
 {
     [Test]
-    public async Task Should_route_message_without_correlation_property_via_finder()
+    public async Task Should_route_message_without_correlation_property_via_projection()
     {
         var context = await Scenario.Define<Context>()
-            .WithEndpoint<EndpointWithCustomFinderSaga>(b =>
-            {
-                b.Services(services => services.AddSingleton<ServerTaskIndex>());
-                b.When(session => session.SendLocal(new StartProcessExecution
-                {
-                    ProcessExecutionId = Guid.NewGuid()
-                }));
-            })
+            .WithEndpoint<EndpointWithProjectionFinderSaga>(b =>
+                b.When(session => session.SendLocal(new StartProcessExecution { ProcessExecutionId = Guid.NewGuid() })))
             .Run();
 
         using (Assert.EnterMultipleScope())
@@ -49,17 +36,12 @@ public class When_using_a_custom_saga_finder : NServiceBusAcceptanceTest
         public bool ServerTaskIdMatched { get; set; }
     }
 
-    public class ServerTaskIndex
+    public class EndpointWithProjectionFinderSaga : EndpointConfigurationBuilder
     {
-        public ConcurrentDictionary<Guid, Guid> ServerTaskIdToSagaId { get; } = new();
-    }
-
-    public class EndpointWithCustomFinderSaga : EndpointConfigurationBuilder
-    {
-        public EndpointWithCustomFinderSaga() => EndpointSetup<DefaultServer>();
+        public EndpointWithProjectionFinderSaga() => EndpointSetup<DefaultServer>();
 
         [Saga]
-        public class ProcessExecutionSaga(Context testContext, ServerTaskIndex index) : Saga<ProcessExecutionSagaData>,
+        public class ProcessExecutionSaga(Context testContext) : Saga<ProcessExecutionSagaData>,
             IAmStartedByMessages<StartProcessExecution>,
             IHandleMessages<ContinueWithServerTask>
         {
@@ -68,7 +50,6 @@ public class When_using_a_custom_saga_finder : NServiceBusAcceptanceTest
                 Data.ProcessExecutionId = message.ProcessExecutionId;
                 Data.ServerTaskId = Guid.NewGuid();
 
-                index.ServerTaskIdToSagaId[Data.ServerTaskId] = Data.Id;
                 testContext.SagaIdFromStart = Data.Id;
 
                 return context.SendLocal(new ContinueWithServerTask
@@ -95,20 +76,15 @@ public class When_using_a_custom_saga_finder : NServiceBusAcceptanceTest
         }
     }
 
-    public class ProcessExecutionSagaFinder(ISagaPersister persister, ServerTaskIndex index)
-        : ISagaFinder<ProcessExecutionSagaData, ContinueWithServerTask>
+    public class ProcessExecutionSagaFinder : ISagaFinder<ProcessExecutionSagaData, ContinueWithServerTask>
     {
-        public async Task<ProcessExecutionSagaData> FindBy(ContinueWithServerTask message,
+        public Task<ProcessExecutionSagaData> FindBy(ContinueWithServerTask message,
             ISynchronizedStorageSession storageSession, IReadOnlyContextBag context,
-            CancellationToken cancellationToken = default)
-        {
-            if (!index.ServerTaskIdToSagaId.TryGetValue(message.ServerTaskId, out var sagaId))
-            {
-                return null;
-            }
-
-            return await persister.Get<ProcessExecutionSagaData>(sagaId, storageSession, (ContextBag)context, cancellationToken);
-        }
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(storageSession.NonDurablePersistenceSession().GetSagaData<ProcessExecutionSagaData>(
+                context,
+                sagaData => sagaData.ServerTaskId == message.ServerTaskId,
+                cancellationToken));
     }
 
     public class ProcessExecutionSagaData : ContainSagaData

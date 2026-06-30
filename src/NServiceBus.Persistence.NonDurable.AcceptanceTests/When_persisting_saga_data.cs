@@ -176,6 +176,7 @@
         {
             public EndpointThatHostsASaga() => EndpointSetup<DefaultServer>();
 
+            [Saga]
             public class SupportedFieldTypesSaga(Context testContext) : Saga<SupportedFieldTypesSagaData>,
                 IAmStartedByMessages<StartSaga>,
                 IHandleMessages<LoadTheSagaAgain>

@@ -30,12 +30,33 @@ namespace NServiceBus
         public NonDurableStorageOptions() { }
         public System.TimeProvider? TimeProvider { get; init; }
     }
+    public static class SynchronizedStorageSessionExtensions
+    {
+        public static NServiceBus.Persistence.NonDurable.INonDurableStorageSession NonDurablePersistenceSession(this NServiceBus.Persistence.ISynchronizedStorageSession session) { }
+    }
 }
 namespace NServiceBus.Persistence.NonDurable
 {
+    public interface INonDurableStorageSession
+    {
+        TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+    }
     public static class NonDurableOutboxSettingsExtensions
     {
         public static NServiceBus.Outbox.OutboxSettings FrequencyToRunDeduplicationDataCleanup(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
         public static NServiceBus.Outbox.OutboxSettings TimeToKeepDeduplicationData(this NServiceBus.Outbox.OutboxSettings settings, System.TimeSpan time) { }
+    }
+}
+namespace NServiceBus.Testing
+{
+    public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession
+    {
+        public TestableNonDurableSynchronizedStorageSession() { }
+        public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage) { }
+        public void AddSaga<TSagaData>(TSagaData sagaData)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
     }
 }
