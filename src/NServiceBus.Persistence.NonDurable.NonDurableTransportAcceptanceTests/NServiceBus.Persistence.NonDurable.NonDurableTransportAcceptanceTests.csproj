@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="10.2.7" GeneratePathProperty="true" />
-    <PackageReference Include="NServiceBus.Transport.NonDurable" Version="0.3.0" />
+    <PackageReference Include="NServiceBus.Transport.NonDurable" Version="0.4.0" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(PkgNServiceBus_AcceptanceTests_Sources)' != ''">
