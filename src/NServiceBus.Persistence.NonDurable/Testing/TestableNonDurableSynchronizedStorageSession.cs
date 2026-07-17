@@ -1,6 +1,7 @@
 namespace NServiceBus.Testing;
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Extensibility;
 using Persistence;
@@ -13,7 +14,7 @@ using Persistence.NonDurable.SagaPersister;
 /// <remarks>
 /// Initializes a new instance of <see cref="TestableNonDurableSynchronizedStorageSession" /> using the specified storage instance and saga options.
 /// </remarks>
-public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage storage, NonDurableSagaOptions sagaOptions) : ISynchronizedStorageSession, INonDurableStorageSession
+public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage storage, NonDurableSagaOptions sagaOptions) : ISynchronizedStorageSession, INonDurableStorageSession, INonDurableSagaLockingSession
 {
     /// <summary>
     /// Initializes a new instance of <see cref="TestableNonDurableSynchronizedStorageSession" /> using a new <see cref="NonDurableStorage" /> instance and default saga options.
@@ -25,7 +26,7 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
     /// <summary>
     /// Initializes a new instance of <see cref="TestableNonDurableSynchronizedStorageSession" /> using a new <see cref="NonDurableStorage" /> instance and the specified saga options.
     /// </summary>
-    public TestableNonDurableSynchronizedStorageSession(NonDurableSagaOptions sagaOptions) : this(new NonDurableStorage(), sagaOptions)
+    public TestableNonDurableSynchronizedStorageSession(NonDurableSagaOptions sagaOptions) : this(CreateStorage(sagaOptions), sagaOptions)
     {
     }
 
@@ -50,13 +51,47 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
     /// <inheritdoc />
     public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
+        NonDurableSagaDataProjection.GetSagaData(storage, this, context, predicate, cancellationToken);
 
     /// <inheritdoc />
     public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
+        NonDurableSagaDataProjection.GetSagaData(storage, this, context, state, predicate, cancellationToken);
+
+    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => storage.SagaConcurrencyMode == NonDurableSagaConcurrencyMode.Pessimistic;
+
+    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken)
+    {
+        if (storage.SagaConcurrencyMode != NonDurableSagaConcurrencyMode.Pessimistic || acquiredSagaLocks.ContainsKey(sagaId))
+        {
+            return false;
+        }
+
+        var lockLease = storage.SagaLocks.Acquire(lockOwnerId, sagaId, cancellationToken);
+        acquiredSagaLocks.Add(sagaId, lockLease);
+        return true;
+    }
+
+    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId)
+    {
+        if (acquiredSagaLocks.Remove(sagaId, out var lockLease))
+        {
+            lockLease.Dispose();
+        }
+    }
 
     readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));
     readonly NonDurableSagaOptions sagaOptions = sagaOptions ?? throw new ArgumentNullException(nameof(sagaOptions));
+    readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
+    readonly Guid lockOwnerId = Guid.NewGuid();
+
+    static NonDurableStorage CreateStorage(NonDurableSagaOptions sagaOptions)
+    {
+        ArgumentNullException.ThrowIfNull(sagaOptions);
+
+        return new NonDurableStorage(new NonDurableStorageOptions
+        {
+            SagaConcurrencyMode = sagaOptions.ConcurrencyMode
+        });
+    }
 }

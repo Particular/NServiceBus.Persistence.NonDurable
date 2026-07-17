@@ -3,17 +3,20 @@ namespace NServiceBus.Persistence.NonDurable;
 using System;
 using System.Threading;
 using Extensibility;
+using SagaPersister;
 
 static class NonDurableSagaDataProjection
 {
     public static TSagaData? GetSagaData<TSagaData>(
         NonDurableStorage storage,
+        INonDurableSagaLockingSession session,
         IReadOnlyContextBag context,
         Func<TSagaData, bool> predicate,
         CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         GetSagaData<TSagaData, Func<TSagaData, bool>>(
             storage,
+            session,
             context,
             predicate,
             static (sagaData, predicate) => predicate(sagaData),
@@ -21,6 +24,7 @@ static class NonDurableSagaDataProjection
 
     public static TSagaData? GetSagaData<TSagaData, TState>(
         NonDurableStorage storage,
+        INonDurableSagaLockingSession session,
         IReadOnlyContextBag context,
         TState state,
         Func<TSagaData, TState, bool> predicate,
@@ -28,6 +32,7 @@ static class NonDurableSagaDataProjection
         where TSagaData : class, IContainSagaData
     {
         ArgumentNullException.ThrowIfNull(storage);
+        ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(predicate);
 
@@ -51,8 +56,48 @@ static class NonDurableSagaDataProjection
                 continue;
             }
 
-            NonDurableSagaPersister.SetEntry(contextBag, sagaId, entry);
-            return sagaData;
+            var lockAcquired = session.TryAcquireSagaLock(sagaId, cancellationToken);
+            try
+            {
+                if (!session.UsesPessimisticSagaConcurrency)
+                {
+                    NonDurableSagaPersister.SetEntry(contextBag, sagaId, entry);
+                    return sagaData;
+                }
+
+                if (!storage.Sagas.TryGetValue(sagaId, out var liveEntry) || liveEntry.SagaDataType != typeof(TSagaData))
+                {
+                    if (lockAcquired)
+                    {
+                        session.ReleaseSagaLock(sagaId);
+                    }
+
+                    continue;
+                }
+
+                var lockedSagaData = (TSagaData)liveEntry.GetSagaCopy();
+                if (!predicate(lockedSagaData, state))
+                {
+                    if (lockAcquired)
+                    {
+                        session.ReleaseSagaLock(sagaId);
+                    }
+
+                    continue;
+                }
+
+                NonDurableSagaPersister.SetEntry(contextBag, sagaId, liveEntry);
+                return lockedSagaData;
+            }
+            catch
+            {
+                if (lockAcquired)
+                {
+                    session.ReleaseSagaLock(sagaId);
+                }
+
+                throw;
+            }
         }
 
         return null;

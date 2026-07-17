@@ -15,6 +15,11 @@ class NonDurableSagaPersister : ISagaPersister
     public NonDurableSagaPersister(NonDurableStorage storage, NonDurableSagaOptions options)
     {
         this.options = options;
+        if (storage.SagaConcurrencyMode != options.ConcurrencyMode)
+        {
+            throw new InvalidOperationException($"The shared {nameof(NonDurableStorage)} instance uses {storage.SagaConcurrencyMode} saga concurrency and cannot be used with persister mode {options.ConcurrencyMode}.");
+        }
+
         sagas = storage.Sagas;
         byCorrelationId = storage.SagaCorrelationIds;
     }
@@ -85,14 +90,34 @@ class NonDurableSagaPersister : ISagaPersister
         where TSagaData : class, IContainSagaData
     {
         using var activity = NonDurablePersistenceTracing.StartSagaGetById(sagaId);
-        if (sagas.TryGetValue(sagaId, out var value))
-        {
-            SetEntry(context, sagaId, value);
+        var lockingSession = (INonDurableSagaLockingSession)session;
+        var lockAcquired = lockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
 
-            var data = value.GetSagaCopy();
-            NonDurablePersistenceTracing.AddHitEvent(activity);
-            NonDurablePersistenceTracing.MarkSuccess(activity);
-            return Task.FromResult((TSagaData)data);
+        try
+        {
+            if (sagas.TryGetValue(sagaId, out var value))
+            {
+                SetEntry(context, sagaId, value);
+
+                var data = value.GetSagaCopy();
+                NonDurablePersistenceTracing.AddHitEvent(activity);
+                NonDurablePersistenceTracing.MarkSuccess(activity);
+                return Task.FromResult((TSagaData)data);
+            }
+        }
+        catch
+        {
+            if (lockAcquired)
+            {
+                lockingSession.ReleaseSagaLock(sagaId);
+            }
+
+            throw;
+        }
+
+        if (lockAcquired)
+        {
+            lockingSession.ReleaseSagaLock(sagaId);
         }
 
         NonDurablePersistenceTracing.AddMissEvent(activity);
@@ -105,16 +130,36 @@ class NonDurableSagaPersister : ISagaPersister
     {
         using var activity = NonDurablePersistenceTracing.StartSagaGetByProperty(typeof(TSagaData), propertyName, propertyValue);
         var key = new CorrelationId(typeof(TSagaData), propertyName, propertyValue);
+        var lockingSession = (INonDurableSagaLockingSession)session;
 
         if (byCorrelationId.TryGetValue(key, out var id))
         {
-            if (sagas.TryGetValue(id, out var value))
+            var lockAcquired = lockingSession.TryAcquireSagaLock(id, cancellationToken);
+
+            try
             {
-                SetEntry(context, id, value);
-                var data = value.GetSagaCopy();
-                NonDurablePersistenceTracing.AddHitEvent(activity);
-                NonDurablePersistenceTracing.MarkSuccess(activity);
-                return Task.FromResult((TSagaData)data);
+                if (sagas.TryGetValue(id, out var value) && value.CorrelationId.Equals(key))
+                {
+                    SetEntry(context, id, value);
+                    var data = value.GetSagaCopy();
+                    NonDurablePersistenceTracing.AddHitEvent(activity);
+                    NonDurablePersistenceTracing.MarkSuccess(activity);
+                    return Task.FromResult((TSagaData)data);
+                }
+            }
+            catch
+            {
+                if (lockAcquired)
+                {
+                    lockingSession.ReleaseSagaLock(id);
+                }
+
+                throw;
+            }
+
+            if (lockAcquired)
+            {
+                lockingSession.ReleaseSagaLock(id);
             }
         }
 

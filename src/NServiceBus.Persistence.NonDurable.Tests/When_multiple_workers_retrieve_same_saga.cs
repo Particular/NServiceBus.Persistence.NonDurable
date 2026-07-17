@@ -1,6 +1,7 @@
 ﻿namespace NServiceBus.Persistence.NonDurable.Tests
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Extensibility;
     using NUnit.Framework;
@@ -206,6 +207,150 @@
                 Throws.InstanceOf<Exception>().And.Message
                     .StartsWith(
                         $"NonDurableSagaPersister concurrency violation: saga entity Id[{saga.Id}] was modified by another process."));
+        }
+
+        [Test]
+        public async Task Pessimistic_get_waits_for_current_holder_and_reads_latest_data()
+        {
+            var saga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Original"
+            };
+
+            var (persister, options, storage) = CreatePessimisticPersister();
+            await SaveSaga(persister, storage, saga);
+
+            var firstSession = new NonDurableSynchronizedStorageSession(storage);
+            await firstSession.Open(new ContextBag());
+            var firstContext = new ContextBag();
+
+            var secondSession = new NonDurableSynchronizedStorageSession(storage);
+            await secondSession.Open(new ContextBag());
+            var secondContext = new ContextBag();
+
+            try
+            {
+                var firstSaga = await persister.Get<TestSagaData>(saga.Id, firstSession, firstContext);
+
+                var secondGetTask = Task.Run(async () =>
+                    await persister.Get<TestSagaData>(saga.Id, secondSession, secondContext));
+
+                Assert.That(await Task.WhenAny(secondGetTask, Task.Delay(200)), Is.Not.SameAs(secondGetTask));
+
+                firstSaga.SomeId = "Updated";
+                await persister.Update(firstSaga, firstSession, firstContext);
+                await firstSession.CompleteAsync();
+
+                var secondSaga = await secondGetTask;
+                Assert.That(secondSaga.SomeId, Is.EqualTo("Updated"));
+
+                await secondSession.CompleteAsync();
+            }
+            finally
+            {
+                firstSession.Dispose();
+                secondSession.Dispose();
+            }
+        }
+
+        [Test]
+        public async Task Pessimistic_get_detects_deadlock_when_two_sessions_wait_on_each_other()
+        {
+            var firstSaga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "First"
+            };
+            var secondSaga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Second"
+            };
+
+            var (persister, options, storage) = CreatePessimisticPersister();
+            await SaveSaga(persister, storage, firstSaga);
+            await SaveSaga(persister, storage, secondSaga);
+
+            var firstSession = new NonDurableSynchronizedStorageSession(storage);
+            await firstSession.Open(new ContextBag());
+
+            var secondSession = new NonDurableSynchronizedStorageSession(storage);
+            await secondSession.Open(new ContextBag());
+
+            try
+            {
+                await persister.Get<TestSagaData>(firstSaga.Id, firstSession, new ContextBag());
+                await persister.Get<TestSagaData>(secondSaga.Id, secondSession, new ContextBag());
+
+                var firstWaitTask = Task.Run(async () =>
+                    await persister.Get<TestSagaData>(secondSaga.Id, firstSession, new ContextBag(), CancellationToken.None));
+
+                Assert.That(await Task.WhenAny(firstWaitTask, Task.Delay(200)), Is.Not.SameAs(firstWaitTask));
+
+                Assert.That(
+                    async () => await persister.Get<TestSagaData>(firstSaga.Id, secondSession, new ContextBag(), CancellationToken.None),
+                    Throws.InstanceOf<Exception>().And.Message.Contains("deadlock detected"));
+
+                secondSession.Dispose();
+                await firstWaitTask;
+            }
+            finally
+            {
+                firstSession.Dispose();
+                secondSession.Dispose();
+            }
+        }
+
+        [Test]
+        public void Shared_storage_rejects_conflicting_saga_concurrency_modes()
+        {
+            var storage = new NonDurableStorage(new NonDurableStorageOptions
+            {
+                SagaConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
+            });
+
+            _ = new NonDurableSagaPersister(storage, new NonDurableSagaOptions
+            {
+                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
+            });
+
+            Assert.That(
+                () => new NonDurableSagaPersister(storage, new NonDurableSagaOptions
+                {
+                    ConcurrencyMode = NonDurableSagaConcurrencyMode.Optimistic
+                }),
+                Throws.InstanceOf<InvalidOperationException>().And.Message.Contains("uses Pessimistic"));
+        }
+
+        static async Task SaveSaga(NonDurableSagaPersister persister, NonDurableStorage storage, TestSagaData saga)
+        {
+            var session = new NonDurableSynchronizedStorageSession(storage);
+            await session.Open(new ContextBag());
+
+            try
+            {
+                await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), session, new ContextBag());
+                await session.CompleteAsync();
+            }
+            finally
+            {
+                session.Dispose();
+            }
+        }
+
+        static (NonDurableSagaPersister Persister, NonDurableSagaOptions Options, NonDurableStorage Storage) CreatePessimisticPersister()
+        {
+            var options = new NonDurableSagaOptions
+            {
+                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
+            };
+            var storage = new NonDurableStorage(new NonDurableStorageOptions
+            {
+                SagaConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
+            });
+            var persister = new NonDurableSagaPersister(storage, options);
+            return (persister, options, storage);
         }
     }
 }

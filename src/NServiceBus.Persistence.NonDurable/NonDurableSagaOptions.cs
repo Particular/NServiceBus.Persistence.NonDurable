@@ -8,6 +8,11 @@ using System.Text.Json;
 public sealed class NonDurableSagaOptions
 {
     /// <summary>
+    /// Gets or sets how saga persistence coordinates concurrent access to saga data.
+    /// </summary>
+    public NonDurableSagaConcurrencyMode ConcurrencyMode { get; init; } = NonDurableSagaConcurrencyMode.Optimistic;
+
+    /// <summary>
     /// Gets or sets the <see cref="JsonSerializerOptions"/> used to persist saga data.
     /// </summary>
     /// <remarks>

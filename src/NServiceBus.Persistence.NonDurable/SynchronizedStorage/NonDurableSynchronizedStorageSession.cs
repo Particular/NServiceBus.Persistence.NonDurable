@@ -1,6 +1,7 @@
 namespace NServiceBus.Persistence.NonDurable;
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,11 +9,12 @@ using System.Transactions;
 using Extensibility;
 using Outbox;
 using Persistence;
+using SagaPersister;
 using Transport;
 
-class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : ICompletableSynchronizedStorageSession, INonDurableStorageSession
+class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : ICompletableSynchronizedStorageSession, INonDurableStorageSession, INonDurableSagaLockingSession
 {
-    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedStorage)
+    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedOptimisticStorage)
     {
     }
 
@@ -30,6 +32,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
             if (ownsTransaction && !enlistedInAmbientTransaction)
             {
                 tx.DisposeTrackedActivities();
+                ReleaseSagaLocks();
             }
 
             Transaction = null;
@@ -49,6 +52,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         {
             Transaction = nonDurableOutboxTransaction.Transaction;
             ownsTransaction = false;
+            nonDurableOutboxTransaction.OnCompleted(ReleaseSagaLocks);
             return new ValueTask<bool>(true);
         }
 
@@ -85,7 +89,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         Transaction = new NonDurableStorageTransaction();
         ownsTransaction = true;
         enlistedInAmbientTransaction = true;
-        enlistmentNotification = new EnlistmentNotification(Transaction);
+        enlistmentNotification = new EnlistmentNotification(Transaction, ReleaseSagaLocks);
         ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
         return new ValueTask<bool>(true);
     }
@@ -101,7 +105,14 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
     {
         if (ownsTransaction && !enlistedInAmbientTransaction && Transaction is not null)
         {
-            Transaction.Commit();
+            try
+            {
+                Transaction.Commit();
+            }
+            finally
+            {
+                ReleaseSagaLocks();
+            }
         }
 
         return Task.CompletedTask;
@@ -116,16 +127,58 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
 
     public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
+        NonDurableSagaDataProjection.GetSagaData(storage, this, context, predicate, cancellationToken);
 
     public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
+        NonDurableSagaDataProjection.GetSagaData(storage, this, context, state, predicate, cancellationToken);
+
+    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => storage.SagaConcurrencyMode == NonDurableSagaConcurrencyMode.Pessimistic;
+
+    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken)
+    {
+        if (storage.SagaConcurrencyMode != NonDurableSagaConcurrencyMode.Pessimistic || acquiredSagaLocks.ContainsKey(sagaId))
+        {
+            return false;
+        }
+
+        var lockLease = storage.SagaLocks.Acquire(lockOwnerId, sagaId, cancellationToken);
+        acquiredSagaLocks.Add(sagaId, lockLease);
+        return true;
+    }
+
+    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId)
+    {
+        if (acquiredSagaLocks.Remove(sagaId, out var lockLease))
+        {
+            lockLease.Dispose();
+        }
+    }
+
+    void ReleaseSagaLocks()
+    {
+        if (sagaLocksReleased)
+        {
+            return;
+        }
+
+        foreach (var lockLease in acquiredSagaLocks.Values)
+        {
+            lockLease.Dispose();
+        }
+
+        acquiredSagaLocks.Clear();
+        sagaLocksReleased = true;
+    }
 
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;
+    bool sagaLocksReleased;
+    readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
+    readonly Guid lockOwnerId = Guid.NewGuid();
+    readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));
 
-    internal class EnlistmentNotification(NonDurableStorageTransaction transaction) : IEnlistmentNotification
+    internal class EnlistmentNotification(NonDurableStorageTransaction transaction, Action releaseSagaLocks) : IEnlistmentNotification
     {
         public TaskCompletionSource TransactionCompletionSource { get; } = new();
 
@@ -145,6 +198,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
 
         public void Commit(Enlistment enlistment)
         {
+            releaseSagaLocks();
             enlistment.Done();
             TransactionCompletionSource.SetResult();
         }
@@ -152,10 +206,15 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         public void Rollback(Enlistment enlistment)
         {
             transaction.Rollback();
+            releaseSagaLocks();
             enlistment.Done();
             TransactionCompletionSource.SetResult();
         }
 
-        public void InDoubt(Enlistment enlistment) => enlistment.Done();
+        public void InDoubt(Enlistment enlistment)
+        {
+            releaseSagaLocks();
+            enlistment.Done();
+        }
     }
 }

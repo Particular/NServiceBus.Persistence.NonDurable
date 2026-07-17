@@ -15,19 +15,27 @@ namespace NServiceBus
         public NServiceBus.NonDurableStorage? Storage { get; init; }
         public System.TimeProvider TimeProvider { get; init; }
     }
+    public enum NonDurableSagaConcurrencyMode
+    {
+        Optimistic = 0,
+        Pessimistic = 1,
+    }
     public sealed class NonDurableSagaOptions
     {
         public NonDurableSagaOptions() { }
+        public NServiceBus.NonDurableSagaConcurrencyMode ConcurrencyMode { get; init; }
         public System.Text.Json.JsonSerializerOptions JsonSerializerOptions { get; init; }
     }
     public class NonDurableStorage
     {
         public NonDurableStorage(NServiceBus.NonDurableStorageOptions? options = null) { }
+        public NServiceBus.NonDurableSagaConcurrencyMode SagaConcurrencyMode { get; }
         public System.TimeProvider TimeProvider { get; }
     }
     public sealed class NonDurableStorageOptions
     {
         public NonDurableStorageOptions() { }
+        public NServiceBus.NonDurableSagaConcurrencyMode SagaConcurrencyMode { get; init; }
         public System.TimeProvider? TimeProvider { get; init; }
     }
     public static class NonDurableSynchronizedStorageSessionExtensions
