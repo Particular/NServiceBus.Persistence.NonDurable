@@ -1,7 +1,6 @@
 namespace NServiceBus.Persistence.NonDurable;
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +26,7 @@ class NonDurableOutboxTransaction : IOutboxTransaction
         }
         finally
         {
-            RunCompletionCallbacks();
+            completionCallbacks.Run();
         }
 
         return Task.CompletedTask;
@@ -35,14 +34,6 @@ class NonDurableOutboxTransaction : IOutboxTransaction
 
     internal void OnCompleted(Action callback)
     {
-        ArgumentNullException.ThrowIfNull(callback);
-
-        if (completionCallbacksExecuted)
-        {
-            callback();
-            return;
-        }
-
         completionCallbacks.Add(callback);
     }
 
@@ -51,7 +42,7 @@ class NonDurableOutboxTransaction : IOutboxTransaction
         if (Transaction is { } tx)
         {
             tx.DisposeTrackedActivities();
-            RunCompletionCallbacks();
+            completionCallbacks.Run();
             Transaction = null;
         }
     }
@@ -62,23 +53,5 @@ class NonDurableOutboxTransaction : IOutboxTransaction
         return default;
     }
 
-    void RunCompletionCallbacks()
-    {
-        if (completionCallbacksExecuted)
-        {
-            return;
-        }
-
-        completionCallbacksExecuted = true;
-
-        foreach (var callback in completionCallbacks)
-        {
-            callback();
-        }
-
-        completionCallbacks.Clear();
-    }
-
-    readonly List<Action> completionCallbacks = [];
-    bool completionCallbacksExecuted;
+    readonly CompletionCallbacks completionCallbacks = new();
 }
