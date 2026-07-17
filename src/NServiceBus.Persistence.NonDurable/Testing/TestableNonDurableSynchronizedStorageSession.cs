@@ -1,7 +1,6 @@
 namespace NServiceBus.Testing;
 
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using Extensibility;
 using Persistence;
@@ -58,32 +57,16 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.GetSagaData(storage, this, context, state, predicate, cancellationToken);
 
-    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => storage.SagaConcurrencyMode == NonDurableSagaConcurrencyMode.Pessimistic;
+    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => sagaLockingSession.UsesPessimisticSagaConcurrency;
 
-    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken)
-    {
-        if (storage.SagaConcurrencyMode != NonDurableSagaConcurrencyMode.Pessimistic || acquiredSagaLocks.ContainsKey(sagaId))
-        {
-            return false;
-        }
+    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken) =>
+        sagaLockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
 
-        var lockLease = storage.SagaLocks.Acquire(lockOwnerId, sagaId, cancellationToken);
-        acquiredSagaLocks.Add(sagaId, lockLease);
-        return true;
-    }
-
-    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId)
-    {
-        if (acquiredSagaLocks.Remove(sagaId, out var lockLease))
-        {
-            lockLease.Dispose();
-        }
-    }
+    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId) => sagaLockingSession.ReleaseSagaLock(sagaId);
 
     readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));
     readonly NonDurableSagaOptions sagaOptions = sagaOptions ?? throw new ArgumentNullException(nameof(sagaOptions));
-    readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
-    readonly Guid lockOwnerId = Guid.NewGuid();
+    readonly SagaLockingSessionState sagaLockingSession = new(storage ?? throw new ArgumentNullException(nameof(storage)));
 
     static NonDurableStorage CreateStorage(NonDurableSagaOptions sagaOptions)
     {

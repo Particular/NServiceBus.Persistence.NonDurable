@@ -1,7 +1,6 @@
 namespace NServiceBus.Persistence.NonDurable;
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,7 +31,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
             if (ownsTransaction && !enlistedInAmbientTransaction)
             {
                 tx.DisposeTrackedActivities();
-                ReleaseSagaLocks();
+                sagaLockingSession.ReleaseAllSagaLocks();
             }
 
             Transaction = null;
@@ -52,7 +51,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         {
             Transaction = nonDurableOutboxTransaction.Transaction;
             ownsTransaction = false;
-            nonDurableOutboxTransaction.OnCompleted(ReleaseSagaLocks);
+            nonDurableOutboxTransaction.OnCompleted(sagaLockingSession.ReleaseAllSagaLocks);
             return new ValueTask<bool>(true);
         }
 
@@ -89,7 +88,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         Transaction = new NonDurableStorageTransaction();
         ownsTransaction = true;
         enlistedInAmbientTransaction = true;
-        enlistmentNotification = new EnlistmentNotification(Transaction, ReleaseSagaLocks);
+        enlistmentNotification = new EnlistmentNotification(Transaction, sagaLockingSession.ReleaseAllSagaLocks);
         ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
         return new ValueTask<bool>(true);
     }
@@ -111,7 +110,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
             }
             finally
             {
-                ReleaseSagaLocks();
+                sagaLockingSession.ReleaseAllSagaLocks();
             }
         }
 
@@ -133,51 +132,17 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.GetSagaData(storage, this, context, state, predicate, cancellationToken);
 
-    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => storage.SagaConcurrencyMode == NonDurableSagaConcurrencyMode.Pessimistic;
+    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => sagaLockingSession.UsesPessimisticSagaConcurrency;
 
-    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken)
-    {
-        if (storage.SagaConcurrencyMode != NonDurableSagaConcurrencyMode.Pessimistic || acquiredSagaLocks.ContainsKey(sagaId))
-        {
-            return false;
-        }
+    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken) =>
+        sagaLockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
 
-        var lockLease = storage.SagaLocks.Acquire(lockOwnerId, sagaId, cancellationToken);
-        acquiredSagaLocks.Add(sagaId, lockLease);
-        return true;
-    }
-
-    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId)
-    {
-        if (acquiredSagaLocks.Remove(sagaId, out var lockLease))
-        {
-            lockLease.Dispose();
-        }
-    }
-
-    void ReleaseSagaLocks()
-    {
-        if (sagaLocksReleased)
-        {
-            return;
-        }
-
-        foreach (var lockLease in acquiredSagaLocks.Values)
-        {
-            lockLease.Dispose();
-        }
-
-        acquiredSagaLocks.Clear();
-        sagaLocksReleased = true;
-    }
+    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId) => sagaLockingSession.ReleaseSagaLock(sagaId);
 
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;
-    bool sagaLocksReleased;
-    // Session-local, only used used by a single message flow
-    readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
-    readonly Guid lockOwnerId = Guid.NewGuid();
     readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));
+    readonly SagaLockingSessionState sagaLockingSession = new(storage ?? throw new ArgumentNullException(nameof(storage)));
 
     internal class EnlistmentNotification(NonDurableStorageTransaction transaction, Action releaseSagaLocks) : IEnlistmentNotification
     {
