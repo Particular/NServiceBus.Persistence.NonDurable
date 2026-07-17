@@ -174,6 +174,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;
     bool sagaLocksReleased;
+    // Session-local, only used used by a single message flow
     readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
     readonly Guid lockOwnerId = Guid.NewGuid();
     readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));

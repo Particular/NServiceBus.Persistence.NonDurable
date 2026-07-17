@@ -9,14 +9,14 @@ static class NonDurableSagaDataProjection
 {
     public static TSagaData? GetSagaData<TSagaData>(
         NonDurableStorage storage,
-        INonDurableSagaLockingSession session,
+        INonDurableSagaLockingSession lockingSession,
         IReadOnlyContextBag context,
         Func<TSagaData, bool> predicate,
         CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         GetSagaData<TSagaData, Func<TSagaData, bool>>(
             storage,
-            session,
+            lockingSession,
             context,
             predicate,
             static (sagaData, predicate) => predicate(sagaData),
@@ -24,7 +24,7 @@ static class NonDurableSagaDataProjection
 
     public static TSagaData? GetSagaData<TSagaData, TState>(
         NonDurableStorage storage,
-        INonDurableSagaLockingSession session,
+        INonDurableSagaLockingSession lockingSession,
         IReadOnlyContextBag context,
         TState state,
         Func<TSagaData, TState, bool> predicate,
@@ -32,7 +32,7 @@ static class NonDurableSagaDataProjection
         where TSagaData : class, IContainSagaData
     {
         ArgumentNullException.ThrowIfNull(storage);
-        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(lockingSession);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(predicate);
 
@@ -56,10 +56,10 @@ static class NonDurableSagaDataProjection
                 continue;
             }
 
-            var lockAcquired = session.TryAcquireSagaLock(sagaId, cancellationToken);
+            var lockAcquired = lockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
             try
             {
-                if (!session.UsesPessimisticSagaConcurrency)
+                if (!lockingSession.UsesPessimisticSagaConcurrency)
                 {
                     NonDurableSagaPersister.SetEntry(contextBag, sagaId, entry);
                     return sagaData;
@@ -69,18 +69,19 @@ static class NonDurableSagaDataProjection
                 {
                     if (lockAcquired)
                     {
-                        session.ReleaseSagaLock(sagaId);
+                        lockingSession.ReleaseSagaLock(sagaId);
                     }
 
                     continue;
                 }
 
+                // First copy of the data may already be stale since the lock was acquired
                 var lockedSagaData = (TSagaData)liveEntry.GetSagaCopy();
                 if (!predicate(lockedSagaData, state))
                 {
                     if (lockAcquired)
                     {
-                        session.ReleaseSagaLock(sagaId);
+                        lockingSession.ReleaseSagaLock(sagaId);
                     }
 
                     continue;
@@ -93,7 +94,7 @@ static class NonDurableSagaDataProjection
             {
                 if (lockAcquired)
                 {
-                    session.ReleaseSagaLock(sagaId);
+                    lockingSession.ReleaseSagaLock(sagaId);
                 }
 
                 throw;

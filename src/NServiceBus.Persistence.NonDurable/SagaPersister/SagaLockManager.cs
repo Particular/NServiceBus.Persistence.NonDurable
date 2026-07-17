@@ -22,6 +22,8 @@ sealed class SagaLockManager
 
             if (lockState.OwnerId is null)
             {
+                // Non-blocking consistency check, not a real wait. If this fails, our ownership bookkeeping
+                // and the semaphore state have diverged, so throw
                 if (!lockState.Semaphore.Wait(0, CancellationToken.None))
                 {
                     throw new InvalidOperationException($"Failed to acquire the free saga lock for Id[{sagaId}].");
@@ -154,6 +156,7 @@ sealed class SagaLockManager
     }
 
     readonly object syncRoot = new();
+    // Regular dictionaries simpler / cheaper as they're only accessed under a lock on syncRoot
     readonly Dictionary<Guid, SagaLockState> lockStates = [];
     readonly Dictionary<Guid, Guid> waitingOwners = [];
 
