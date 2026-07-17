@@ -56,48 +56,33 @@ static class NonDurableSagaDataProjection
                 continue;
             }
 
-            var lockAcquired = lockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
-            try
+            if (!lockingSession.UsesPessimisticSagaConcurrency)
             {
-                if (!lockingSession.UsesPessimisticSagaConcurrency)
-                {
-                    NonDurableSagaPersister.SetEntry(contextBag, sagaId, entry);
-                    return sagaData;
-                }
-
-                if (!storage.Sagas.TryGetValue(sagaId, out var liveEntry) || liveEntry.SagaDataType != typeof(TSagaData))
-                {
-                    if (lockAcquired)
-                    {
-                        lockingSession.ReleaseSagaLock(sagaId);
-                    }
-
-                    continue;
-                }
-
-                // First copy of the data may already be stale since the lock was acquired
-                var lockedSagaData = (TSagaData)liveEntry.GetSagaCopy();
-                if (!predicate(lockedSagaData, state))
-                {
-                    if (lockAcquired)
-                    {
-                        lockingSession.ReleaseSagaLock(sagaId);
-                    }
-
-                    continue;
-                }
-
-                NonDurableSagaPersister.SetEntry(contextBag, sagaId, liveEntry);
-                return lockedSagaData;
+                NonDurableSagaPersister.SetEntry(contextBag, sagaId, entry);
+                return sagaData;
             }
-            catch
-            {
-                if (lockAcquired)
-                {
-                    lockingSession.ReleaseSagaLock(sagaId);
-                }
 
-                throw;
+            var lockedSagaData = SagaReadLocking.ReadCurrent<TSagaData>(
+                storage.Sagas,
+                lockingSession,
+                sagaId,
+                liveEntry =>
+                {
+                    if (liveEntry.SagaDataType != typeof(TSagaData))
+                    {
+                        return null;
+                    }
+
+                    // First copy of the data may already be stale since the lock was acquired.
+                    var currentSagaData = (TSagaData)liveEntry.GetSagaCopy();
+                    return predicate(currentSagaData, state) ? currentSagaData : null;
+                },
+                (capturedSagaId, capturedEntry) => NonDurableSagaPersister.SetEntry(contextBag, capturedSagaId, capturedEntry),
+                cancellationToken);
+
+            if (lockedSagaData is not null)
+            {
+                return lockedSagaData;
             }
         }
 
