@@ -6,11 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 static class NonDurableStorageRuntime
 {
-    public static NonDurableStorage SharedOptimisticStorage { get; } = new();
-    public static NonDurableStorage SharedPessimisticStorage { get; } = new(new NonDurableStorageOptions
-    {
-        SagaConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
-    });
+    public static NonDurableStorage SharedStorage { get; } = new();
 
     public static void Configure(IServiceCollection services, NonDurablePersistenceOptions persistenceOptions)
     {
@@ -20,19 +16,10 @@ static class NonDurableStorageRuntime
             ?? (persistenceOptions.TimeProvider != TimeProvider.System
                 ? new NonDurableStorage(new NonDurableStorageOptions
                 {
-                    TimeProvider = persistenceOptions.TimeProvider,
-                    SagaConcurrencyMode = persistenceOptions.Saga.ConcurrencyMode
+                    TimeProvider = persistenceOptions.TimeProvider
                 })
                 : null)
-            ?? GetSharedStorage(persistenceOptions.Saga.ConcurrencyMode);
+            ?? SharedStorage;
         services.TryAddSingleton(storage);
     }
-
-    static NonDurableStorage GetSharedStorage(NonDurableSagaConcurrencyMode concurrencyMode) =>
-        concurrencyMode switch
-        {
-            NonDurableSagaConcurrencyMode.Optimistic => SharedOptimisticStorage,
-            NonDurableSagaConcurrencyMode.Pessimistic => SharedPessimisticStorage,
-            _ => throw new ArgumentOutOfRangeException(nameof(concurrencyMode), concurrencyMode, "Unsupported saga concurrency mode.")
-        };
 }

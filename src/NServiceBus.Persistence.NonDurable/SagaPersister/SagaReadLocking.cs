@@ -10,6 +10,7 @@ static class SagaReadLocking
         ConcurrentDictionary<Guid, SagaEntry> sagas,
         INonDurableSagaLockingSession lockingSession,
         Guid sagaId,
+        SagaEntry entry,
         Func<SagaEntry, TSagaData?> tryRead,
         Action<Guid, SagaEntry> captureEntry,
         CancellationToken cancellationToken = default)
@@ -17,16 +18,30 @@ static class SagaReadLocking
     {
         ArgumentNullException.ThrowIfNull(sagas);
         ArgumentNullException.ThrowIfNull(lockingSession);
+        ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(tryRead);
         ArgumentNullException.ThrowIfNull(captureEntry);
 
-        var lockAcquired = lockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
+        if (!entry.UsesPessimisticConcurrency)
+        {
+            if (tryRead(entry) is { } sagaData)
+            {
+                captureEntry(sagaId, entry);
+                return sagaData;
+            }
+
+            return null;
+        }
+
+        var lockAcquired = lockingSession.TryAcquireSagaLock(sagaId, entry, cancellationToken);
 
         try
         {
-            if (sagas.TryGetValue(sagaId, out var entry) && tryRead(entry) is { } sagaData)
+            if (sagas.TryGetValue(sagaId, out var currentEntry)
+                && entry.HasSameLockIdentity(currentEntry)
+                && tryRead(currentEntry) is { } sagaData)
             {
-                captureEntry(sagaId, entry);
+                captureEntry(sagaId, currentEntry);
                 return sagaData;
             }
         }
@@ -34,7 +49,7 @@ static class SagaReadLocking
         {
             if (lockAcquired)
             {
-                lockingSession.ReleaseSagaLock(sagaId);
+                lockingSession.ReleaseSagaLock(entry);
             }
 
             throw;
@@ -42,7 +57,7 @@ static class SagaReadLocking
 
         if (lockAcquired)
         {
-            lockingSession.ReleaseSagaLock(sagaId);
+            lockingSession.ReleaseSagaLock(entry);
         }
 
         return null;

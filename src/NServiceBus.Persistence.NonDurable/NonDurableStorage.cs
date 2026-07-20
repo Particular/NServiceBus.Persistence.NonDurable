@@ -15,11 +15,10 @@ public class NonDurableStorage
     /// <summary>
     /// Initializes a new instance of <see cref="NonDurableStorage"/> with the specified options.
     /// </summary>
-    /// <param name="options">The options to configure the non-durable persistence storage. When <c>null</c>, <see cref="TimeProvider.System"/> and optimistic saga concurrency are used.</param>
+    /// <param name="options">The options to configure the non-durable persistence storage. When <c>null</c>, <see cref="TimeProvider.System"/> is used.</param>
     public NonDurableStorage(NonDurableStorageOptions? options = null)
     {
         TimeProvider = options?.TimeProvider ?? TimeProvider.System;
-        SagaConcurrencyMode = options?.SagaConcurrencyMode ?? NonDurableSagaConcurrencyMode.Optimistic;
     }
 
     /// <summary>
@@ -27,16 +26,9 @@ public class NonDurableStorage
     /// </summary>
     public TimeProvider TimeProvider { get; }
 
-    /// <summary>
-    /// The saga concurrency mode used by this storage instance.
-    /// </summary>
-    public NonDurableSagaConcurrencyMode SagaConcurrencyMode { get; }
-
     internal ConcurrentDictionary<Guid, SagaEntry> Sagas { get; } = new();
 
     internal ConcurrentDictionary<CorrelationId, Guid> SagaCorrelationIds { get; } = new();
-
-    internal SagaLockManager SagaLocks { get; } = new();
 
     internal ConcurrentDictionary<string, StoredOutboxMessage> OutboxMessages { get; } = new(StringComparer.Ordinal);
 

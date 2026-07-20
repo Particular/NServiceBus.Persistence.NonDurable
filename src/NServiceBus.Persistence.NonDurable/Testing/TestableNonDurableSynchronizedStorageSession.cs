@@ -25,7 +25,7 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
     /// <summary>
     /// Initializes a new instance of <see cref="TestableNonDurableSynchronizedStorageSession" /> using a new <see cref="NonDurableStorage" /> instance and the specified saga options.
     /// </summary>
-    public TestableNonDurableSynchronizedStorageSession(NonDurableSagaOptions sagaOptions) : this(CreateStorage(sagaOptions), sagaOptions)
+    public TestableNonDurableSynchronizedStorageSession(NonDurableSagaOptions sagaOptions) : this(new NonDurableStorage(), sagaOptions)
     {
     }
 
@@ -44,7 +44,7 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
         ArgumentNullException.ThrowIfNull(sagaData);
 
         var noCorrelationId = new CorrelationId(typeof(object), string.Empty, new object());
-        storage.Sagas[sagaData.Id] = new SagaEntry(sagaData, noCorrelationId, version: 1, sagaOptions.JsonSerializerOptions);
+        storage.Sagas[sagaData.Id] = new SagaEntry(sagaData, noCorrelationId, version: 1, sagaOptions.ConcurrencyMode, sagaOptions.JsonSerializerOptions);
     }
 
     /// <inheritdoc />
@@ -57,24 +57,12 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.GetSagaData(storage, this, context, state, predicate, cancellationToken);
 
-    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => sagaLockingSession.UsesPessimisticSagaConcurrency;
+    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, SagaEntry entry, CancellationToken cancellationToken) =>
+        sagaLockingSession.TryAcquireSagaLock(sagaId, entry, cancellationToken);
 
-    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken) =>
-        sagaLockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
-
-    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId) => sagaLockingSession.ReleaseSagaLock(sagaId);
+    void INonDurableSagaLockingSession.ReleaseSagaLock(SagaEntry entry) => sagaLockingSession.ReleaseSagaLock(entry);
 
     readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));
     readonly NonDurableSagaOptions sagaOptions = sagaOptions ?? throw new ArgumentNullException(nameof(sagaOptions));
-    readonly SagaLockingSessionState sagaLockingSession = new(storage ?? throw new ArgumentNullException(nameof(storage)));
-
-    static NonDurableStorage CreateStorage(NonDurableSagaOptions sagaOptions)
-    {
-        ArgumentNullException.ThrowIfNull(sagaOptions);
-
-        return new NonDurableStorage(new NonDurableStorageOptions
-        {
-            SagaConcurrencyMode = sagaOptions.ConcurrencyMode
-        });
-    }
+    readonly SagaLockingSessionState sagaLockingSession = new((sagaOptions ?? throw new ArgumentNullException(nameof(sagaOptions))).PessimisticLockTimeout);
 }

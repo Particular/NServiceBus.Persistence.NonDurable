@@ -56,7 +56,7 @@ static class NonDurableSagaDataProjection
                 continue;
             }
 
-            if (!lockingSession.UsesPessimisticSagaConcurrency)
+            if (!entry.UsesPessimisticConcurrency)
             {
                 NonDurableSagaPersister.SetEntry(contextBag, sagaId, entry);
                 return sagaData;
@@ -66,13 +66,9 @@ static class NonDurableSagaDataProjection
                 storage.Sagas,
                 lockingSession,
                 sagaId,
+                entry,
                 liveEntry =>
                 {
-                    if (liveEntry.SagaDataType != typeof(TSagaData))
-                    {
-                        return null;
-                    }
-
                     // First copy of the data may already be stale since the lock was acquired.
                     var currentSagaData = (TSagaData)liveEntry.GetSagaCopy();
                     return predicate(currentSagaData, state) ? currentSagaData : null;

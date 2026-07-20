@@ -7,7 +7,7 @@ using NUnit.Framework;
 public class When_registering_nondurable_storage
 {
     [Test]
-    public void Should_use_dependency_injection_then_explicit_configuration_then_shared_storage_for_matching_mode()
+    public void Should_use_dependency_injection_then_explicit_configuration_then_shared_default()
     {
         var serviceCollection = new ServiceCollection();
         var serviceProviderStorage = new NonDurableStorage();
@@ -32,19 +32,6 @@ public class When_registering_nondurable_storage
         NonDurableStorageRuntime.Configure(defaultServices, new NonDurablePersistenceOptions());
 
         using var defaultProvider = defaultServices.BuildServiceProvider();
-        Assert.That(defaultProvider.GetRequiredService<NonDurableStorage>(), Is.SameAs(NonDurableStorageRuntime.SharedOptimisticStorage));
-
-        var pessimisticServices = new ServiceCollection();
-
-        NonDurableStorageRuntime.Configure(pessimisticServices, new NonDurablePersistenceOptions
-        {
-            Saga = new NonDurableSagaOptions
-            {
-                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
-            }
-        });
-
-        using var pessimisticProvider = pessimisticServices.BuildServiceProvider();
-        Assert.That(pessimisticProvider.GetRequiredService<NonDurableStorage>(), Is.SameAs(NonDurableStorageRuntime.SharedPessimisticStorage));
+        Assert.That(defaultProvider.GetRequiredService<NonDurableStorage>(), Is.SameAs(NonDurableStorageRuntime.SharedStorage));
     }
 }

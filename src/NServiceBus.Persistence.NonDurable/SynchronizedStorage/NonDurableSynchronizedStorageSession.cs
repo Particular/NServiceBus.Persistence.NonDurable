@@ -13,14 +13,19 @@ using Transport;
 
 class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSession, INonDurableStorageSession, INonDurableSagaLockingSession
 {
-    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedOptimisticStorage)
+    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedStorage, new NonDurableSagaOptions())
     {
     }
 
-    public NonDurableSynchronizedStorageSession(NonDurableStorage storage)
+    public NonDurableSynchronizedStorageSession(NonDurableStorage storage) : this(storage, new NonDurableSagaOptions())
+    {
+    }
+
+    public NonDurableSynchronizedStorageSession(NonDurableStorage storage, NonDurableSagaOptions sagaOptions)
     {
         this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-        sagaLockingSession = new SagaLockingSessionState(this.storage);
+        ArgumentNullException.ThrowIfNull(sagaOptions);
+        sagaLockingSession = new SagaLockingSessionState(sagaOptions.PessimisticLockTimeout);
         completionCallbacks.Add(sagaLockingSession.ReleaseAllSagaLocks);
     }
 
@@ -139,12 +144,10 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.GetSagaData(storage, this, context, state, predicate, cancellationToken);
 
-    bool INonDurableSagaLockingSession.UsesPessimisticSagaConcurrency => sagaLockingSession.UsesPessimisticSagaConcurrency;
+    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, SagaEntry entry, CancellationToken cancellationToken) =>
+        sagaLockingSession.TryAcquireSagaLock(sagaId, entry, cancellationToken);
 
-    bool INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken) =>
-        sagaLockingSession.TryAcquireSagaLock(sagaId, cancellationToken);
-
-    void INonDurableSagaLockingSession.ReleaseSagaLock(Guid sagaId) => sagaLockingSession.ReleaseSagaLock(sagaId);
+    void INonDurableSagaLockingSession.ReleaseSagaLock(SagaEntry entry) => sagaLockingSession.ReleaseSagaLock(entry);
 
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;

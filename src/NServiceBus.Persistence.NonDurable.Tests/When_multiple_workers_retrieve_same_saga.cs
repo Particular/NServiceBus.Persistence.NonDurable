@@ -219,7 +219,7 @@
             };
 
             var (persister, options, storage) = CreatePessimisticPersister();
-            await SaveSaga(persister, storage, saga);
+            await SaveSaga(persister, options, storage, saga);
 
             var firstSession = new NonDurableSynchronizedStorageSession(storage);
             await firstSession.Open(new ContextBag());
@@ -255,77 +255,95 @@
         }
 
         [Test]
-        public async Task Pessimistic_get_detects_deadlock_when_two_sessions_wait_on_each_other()
+        public async Task Pessimistic_get_times_out_when_lock_is_held_too_long()
         {
-            var firstSaga = new TestSagaData
+            var saga = new TestSagaData
             {
                 Id = Guid.NewGuid(),
-                SomeId = "First"
-            };
-            var secondSaga = new TestSagaData
-            {
-                Id = Guid.NewGuid(),
-                SomeId = "Second"
+                SomeId = "TimedOut"
             };
 
-            var (persister, options, storage) = CreatePessimisticPersister();
-            await SaveSaga(persister, storage, firstSaga);
-            await SaveSaga(persister, storage, secondSaga);
+            var options = new NonDurableSagaOptions
+            {
+                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic,
+                PessimisticLockTimeout = TimeSpan.FromMilliseconds(200)
+            };
+            var storage = new NonDurableStorage();
+            var persister = new NonDurableSagaPersister(storage, options);
+            await SaveSaga(persister, options, storage, saga);
 
             var firstSession = new NonDurableSynchronizedStorageSession(storage);
             await firstSession.Open(new ContextBag());
+            var firstContext = new ContextBag();
 
-            var secondSession = new NonDurableSynchronizedStorageSession(storage);
-            await secondSession.Open(new ContextBag());
+            var waitingSession = new NonDurableSynchronizedStorageSession(storage, options);
+            await waitingSession.Open(new ContextBag());
 
             try
             {
-                await persister.Get<TestSagaData>(firstSaga.Id, firstSession, new ContextBag());
-                await persister.Get<TestSagaData>(secondSaga.Id, secondSession, new ContextBag());
-
-                var firstWaitTask = Task.Run(async () =>
-                    await persister.Get<TestSagaData>(secondSaga.Id, firstSession, new ContextBag(), CancellationToken.None));
-
-                Assert.That(await Task.WhenAny(firstWaitTask, Task.Delay(200)), Is.Not.SameAs(firstWaitTask));
+                await persister.Get<TestSagaData>(saga.Id, firstSession, firstContext);
 
                 Assert.That(
-                    async () => await persister.Get<TestSagaData>(firstSaga.Id, secondSession, new ContextBag(), CancellationToken.None),
-                    Throws.InstanceOf<Exception>().And.Message.Contains("deadlock detected"));
-
-                secondSession.Dispose();
-                await firstWaitTask;
+                    async () => await persister.Get<TestSagaData>(saga.Id, waitingSession, new ContextBag(), CancellationToken.None),
+                    Throws.InstanceOf<TimeoutException>().And.Message.Contains("timed out"));
             }
             finally
             {
                 firstSession.Dispose();
-                secondSession.Dispose();
+                waitingSession.Dispose();
             }
         }
 
         [Test]
-        public void Shared_storage_rejects_conflicting_saga_concurrency_modes()
+        public async Task Shared_storage_allows_mixed_saga_concurrency_modes()
         {
-            var storage = new NonDurableStorage(new NonDurableStorageOptions
-            {
-                SagaConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
-            });
-
-            _ = new NonDurableSagaPersister(storage, new NonDurableSagaOptions
+            var storage = new NonDurableStorage();
+            var pessimisticOptions = new NonDurableSagaOptions
             {
                 ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
-            });
+            };
+            var optimisticOptions = new NonDurableSagaOptions
+            {
+                ConcurrencyMode = NonDurableSagaConcurrencyMode.Optimistic
+            };
 
-            Assert.That(
-                () => new NonDurableSagaPersister(storage, new NonDurableSagaOptions
-                {
-                    ConcurrencyMode = NonDurableSagaConcurrencyMode.Optimistic
-                }),
-                Throws.InstanceOf<InvalidOperationException>().And.Message.Contains("uses Pessimistic"));
+            var pessimisticPersister = new NonDurableSagaPersister(storage, pessimisticOptions);
+            var optimisticPersister = new NonDurableSagaPersister(storage, optimisticOptions);
+
+            var pessimisticSaga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Pessimistic"
+            };
+            var optimisticSaga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Optimistic"
+            };
+
+            await SaveSaga(pessimisticPersister, pessimisticOptions, storage, pessimisticSaga);
+            await SaveSaga(optimisticPersister, optimisticOptions, storage, optimisticSaga);
+
+            var pessimisticRead = await optimisticPersister.Get<TestSagaData>(
+                pessimisticSaga.Id,
+                new NonDurableSynchronizedStorageSession(storage, optimisticOptions),
+                new ContextBag());
+
+            var optimisticRead = await pessimisticPersister.Get<TestSagaData>(
+                optimisticSaga.Id,
+                new NonDurableSynchronizedStorageSession(storage, pessimisticOptions),
+                new ContextBag());
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(pessimisticRead.SomeId, Is.EqualTo("Pessimistic"));
+                Assert.That(optimisticRead.SomeId, Is.EqualTo("Optimistic"));
+            });
         }
 
-        static async Task SaveSaga(NonDurableSagaPersister persister, NonDurableStorage storage, TestSagaData saga)
+        static async Task SaveSaga(NonDurableSagaPersister persister, NonDurableSagaOptions options, NonDurableStorage storage, TestSagaData saga)
         {
-            var session = new NonDurableSynchronizedStorageSession(storage);
+            var session = new NonDurableSynchronizedStorageSession(storage, options);
             await session.Open(new ContextBag());
 
             try
@@ -343,12 +361,10 @@
         {
             var options = new NonDurableSagaOptions
             {
-                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
+                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic,
+                PessimisticLockTimeout = TimeSpan.FromSeconds(5)
             };
-            var storage = new NonDurableStorage(new NonDurableStorageOptions
-            {
-                SagaConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
-            });
+            var storage = new NonDurableStorage();
             var persister = new NonDurableSagaPersister(storage, options);
             return (persister, options, storage);
         }

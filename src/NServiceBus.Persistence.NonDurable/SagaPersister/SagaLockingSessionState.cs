@@ -4,25 +4,31 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-sealed class SagaLockingSessionState(NonDurableStorage storage) : INonDurableSagaLockingSession
+sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDurableSagaLockingSession
 {
-    public bool UsesPessimisticSagaConcurrency => storage.SagaConcurrencyMode == NonDurableSagaConcurrencyMode.Pessimistic;
-
-    public bool TryAcquireSagaLock(Guid sagaId, CancellationToken cancellationToken = default)
+    public bool TryAcquireSagaLock(Guid sagaId, SagaEntry entry, CancellationToken cancellationToken = default)
     {
-        if (storage.SagaConcurrencyMode != NonDurableSagaConcurrencyMode.Pessimistic || acquiredSagaLocks.ContainsKey(sagaId))
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (!entry.TryGetLockState(out var lockState) || acquiredSagaLocks.ContainsKey(lockState.Identity))
         {
             return false;
         }
 
-        var lockLease = storage.SagaLocks.Acquire(lockOwnerId, sagaId, cancellationToken);
-        acquiredSagaLocks.Add(sagaId, lockLease);
+        if (!lockState.TryAcquire(pessimisticLockTimeout, cancellationToken))
+        {
+            throw new NonDurableSagaLockTimeoutException(sagaId, pessimisticLockTimeout);
+        }
+
+        acquiredSagaLocks.Add(lockState.Identity, new SagaLockLease(lockState));
         return true;
     }
 
-    public void ReleaseSagaLock(Guid sagaId)
+    public void ReleaseSagaLock(SagaEntry entry)
     {
-        if (acquiredSagaLocks.Remove(sagaId, out var lockLease))
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (entry.TryGetLockState(out var lockState) && acquiredSagaLocks.Remove(lockState.Identity, out var lockLease))
         {
             lockLease.Dispose();
         }
@@ -45,7 +51,23 @@ sealed class SagaLockingSessionState(NonDurableStorage storage) : INonDurableSag
     }
 
     bool sagaLocksReleased;
-    // Session-local, only used by a single message flow.
     readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
-    readonly Guid lockOwnerId = Guid.NewGuid();
+    readonly TimeSpan pessimisticLockTimeout = pessimisticLockTimeout > TimeSpan.Zero
+        ? pessimisticLockTimeout
+        : throw new ArgumentOutOfRangeException(nameof(pessimisticLockTimeout), pessimisticLockTimeout, "Pessimistic lock timeout must be greater than zero.");
+
+    sealed class SagaLockLease(SagaLockState lockState) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref disposed, 1) != 0)
+            {
+                return;
+            }
+
+            lockState.Release();
+        }
+
+        int disposed;
+    }
 }
