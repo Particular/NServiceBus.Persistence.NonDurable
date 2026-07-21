@@ -14,10 +14,7 @@ static class NonDurableStorageRuntime
 
         var storage = persistenceOptions.Storage
             ?? (persistenceOptions.TimeProvider != TimeProvider.System
-                ? new NonDurableStorage(new NonDurableStorageOptions
-                {
-                    TimeProvider = persistenceOptions.TimeProvider
-                })
+                ? new NonDurableStorage(new NonDurableStorageOptions { TimeProvider = persistenceOptions.TimeProvider })
                 : null)
             ?? SharedStorage;
         services.TryAddSingleton(storage);
