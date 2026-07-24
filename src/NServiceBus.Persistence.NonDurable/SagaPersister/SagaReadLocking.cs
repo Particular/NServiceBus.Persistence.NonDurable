@@ -1,15 +1,34 @@
 namespace NServiceBus.Persistence.NonDurable.SagaPersister;
 
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
 static class SagaReadLocking
 {
+    public static ValueTask<TSagaData?> ReadCurrent<TSagaData>(
+        IReadOnlyDictionary<Guid, SagaEntry> sagas,
+        INonDurableSagaLockingSession lockingSession,
+        Func<SagaReadCandidate?> resolveCandidate,
+        Func<SagaEntry, TSagaData?> tryRead,
+        Action<Guid, SagaEntry> captureEntry,
+        bool retryOnReadMiss = false,
+        CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        ReadCurrent(
+            sagas,
+            lockingSession,
+            (ResolveCandidate: resolveCandidate, TryRead: tryRead, CaptureEntry: captureEntry),
+            static state => state.ResolveCandidate(),
+            static (entry, state) => state.TryRead(entry),
+            static (sagaId, entry, state) => state.CaptureEntry(sagaId, entry),
+            retryOnReadMiss,
+            cancellationToken);
+
     public static async ValueTask<TSagaData?> ReadCurrent<TSagaData, TState>(
-        ConcurrentDictionary<Guid, SagaEntry> sagas,
+        IReadOnlyDictionary<Guid, SagaEntry> sagas,
         INonDurableSagaLockingSession lockingSession,
         TState state,
         Func<TState, SagaReadCandidate?> resolveCandidate,
