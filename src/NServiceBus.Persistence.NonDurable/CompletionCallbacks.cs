@@ -15,7 +15,7 @@ sealed class CompletionCallbacks
             return;
         }
 
-        callbacks.Add(new CompletionCallback<TState>(state, callback));
+        (callbacks ??= []).Add(new CompletionCallback<TState>(state, callback));
     }
 
     public void Run()
@@ -26,6 +26,11 @@ sealed class CompletionCallbacks
         }
 
         callbacksExecuted = true;
+
+        if (callbacks is null)
+        {
+            return;
+        }
 
         foreach (var callback in callbacks)
         {
@@ -45,6 +50,6 @@ sealed class CompletionCallbacks
         public void Invoke() => callback(state);
     }
 
-    readonly List<ICompletionCallback> callbacks = [];
+    List<ICompletionCallback>? callbacks;
     bool callbacksExecuted;
 }
