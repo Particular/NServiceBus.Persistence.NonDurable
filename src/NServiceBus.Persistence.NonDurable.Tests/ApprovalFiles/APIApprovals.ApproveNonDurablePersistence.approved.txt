@@ -46,8 +46,16 @@ namespace NServiceBus.Persistence.NonDurable
 {
     public interface INonDurableStorageSession
     {
+        System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+        System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
+            "ing and will be removed in the next major version.")]
         TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
+        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
+            "ing and will be removed in the next major version.")]
         TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
     }
@@ -59,15 +67,25 @@ namespace NServiceBus.Persistence.NonDurable
 }
 namespace NServiceBus.Testing
 {
-    public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession
+    public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession, System.IAsyncDisposable, System.IDisposable
     {
         public TestableNonDurableSynchronizedStorageSession() { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableSagaOptions sagaOptions) { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage) { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage, NServiceBus.NonDurableSagaOptions sagaOptions) { }
         public void AddSaga(NServiceBus.IContainSagaData sagaData) { }
+        public void Dispose() { }
+        public System.Threading.Tasks.ValueTask DisposeAsync() { }
+        public System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        public System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
+            "ing and will be removed in the next major version.")]
         public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
+        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
+            "ing and will be removed in the next major version.")]
         public TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
     }

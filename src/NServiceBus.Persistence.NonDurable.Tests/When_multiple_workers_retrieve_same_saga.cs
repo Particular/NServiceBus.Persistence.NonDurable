@@ -1,10 +1,13 @@
 ﻿namespace NServiceBus.Persistence.NonDurable.Tests
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Threading;
     using System.Threading.Tasks;
     using Extensibility;
     using NUnit.Framework;
+    using SagaPersister;
+    using Testing;
 
     [TestFixture]
     class When_multiple_workers_retrieve_same_saga
@@ -233,8 +236,7 @@
             {
                 var firstSaga = await persister.Get<TestSagaData>(saga.Id, firstSession, firstContext);
 
-                var secondGetTask = Task.Run(async () =>
-                    await persister.Get<TestSagaData>(saga.Id, secondSession, secondContext));
+                var secondGetTask = persister.Get<TestSagaData>(saga.Id, secondSession, secondContext);
 
                 Assert.That(await Task.WhenAny(secondGetTask, Task.Delay(200)), Is.Not.SameAs(secondGetTask));
 
@@ -292,6 +294,156 @@
                 firstSession.Dispose();
                 waitingSession.Dispose();
             }
+        }
+
+        [Test]
+        public async Task Read_retries_when_candidate_was_recreated_before_lock_validation()
+        {
+            var sagaId = Guid.NewGuid();
+            var serializerOptions = new NonDurableSagaOptions().JsonSerializerOptions;
+            var noCorrelationId = new CorrelationId(typeof(object), string.Empty, new object());
+            var oldEntry = new SagaEntry(
+                new TestSagaData { Id = sagaId, SomeId = "Old" },
+                noCorrelationId,
+                version: 1,
+                NonDurableSagaConcurrencyMode.Pessimistic,
+                serializerOptions);
+            var recreatedEntry = new SagaEntry(
+                new TestSagaData { Id = sagaId, SomeId = "Recreated" },
+                noCorrelationId,
+                version: 1,
+                NonDurableSagaConcurrencyMode.Pessimistic,
+                serializerOptions);
+            var sagas = new ConcurrentDictionary<Guid, SagaEntry>();
+            sagas[sagaId] = recreatedEntry;
+            var lockingSession = new SagaLockingSessionState(TimeSpan.FromSeconds(1));
+            var resolveCount = 0;
+
+            try
+            {
+                var result = await SagaReadLocking.ReadCurrent(
+                    sagas,
+                    lockingSession,
+                    () => new(
+                        sagaId,
+                        resolveCount++ == 0 ? oldEntry : sagas[sagaId]),
+                    entry => (TestSagaData)entry.GetSagaCopy(),
+                    static (_, _) => { });
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(result!.SomeId, Is.EqualTo("Recreated"));
+                    Assert.That(resolveCount, Is.EqualTo(2));
+                });
+            }
+            finally
+            {
+                lockingSession.ReleaseAllSagaLocks();
+            }
+        }
+
+        [Test]
+        public async Task Completion_keeps_saga_slot_reserved_until_commit_outcome()
+        {
+            var saga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Reserved"
+            };
+
+            var (persister, options, storage) = CreatePessimisticPersister();
+            await SaveSaga(persister, options, storage, saga);
+
+            var completingSession = new NonDurableSynchronizedStorageSession(storage, options);
+            await completingSession.Open(new ContextBag());
+            var completingContext = new ContextBag();
+            var loadedSaga = await persister.Get<TestSagaData>(saga.Id, completingSession, completingContext);
+            await persister.Complete(loadedSaga, completingSession, completingContext);
+
+            // This models ambient transaction prepare: storage operations have been applied,
+            // but the transaction outcome callback has not run yet.
+            completingSession.Transaction!.Commit();
+
+            var competingSession = new NonDurableSynchronizedStorageSession(storage, options);
+            await competingSession.Open(new ContextBag());
+            await persister.Save(saga, SagaMetadataHelper.GetMetadata<TestSaga>(saga), competingSession, new ContextBag());
+
+            Assert.That(
+                async () => await competingSession.CompleteAsync(),
+                Throws.InstanceOf<InvalidOperationException>().And.Message.Contains("correlation id already exists"));
+
+            await completingSession.CompleteAsync();
+
+            var recreatedSaga = new TestSagaData
+            {
+                Id = saga.Id,
+                SomeId = saga.SomeId
+            };
+            await SaveSaga(persister, options, storage, recreatedSaga);
+
+            var readSession = new NonDurableSynchronizedStorageSession(storage, options);
+            var recreated = await persister.Get<TestSagaData>(saga.Id, readSession, new ContextBag());
+            Assert.That(recreated, Is.Not.Null);
+            readSession.Dispose();
+        }
+
+        [Test]
+        public async Task Completion_rollback_restores_original_lineage()
+        {
+            var saga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Rollback"
+            };
+
+            var (persister, options, storage) = CreatePessimisticPersister();
+            await SaveSaga(persister, options, storage, saga);
+
+            var completingSession = new NonDurableSynchronizedStorageSession(storage, options);
+            await completingSession.Open(new ContextBag());
+            var completingContext = new ContextBag();
+            var loadedSaga = await persister.Get<TestSagaData>(saga.Id, completingSession, completingContext);
+            await persister.Complete(loadedSaga, completingSession, completingContext);
+
+            completingSession.Transaction!.Commit();
+            completingSession.Transaction.Rollback();
+            completingSession.Dispose();
+
+            var readingSession = new NonDurableSynchronizedStorageSession(storage, options);
+            var restored = await persister.Get<TestSagaData>(saga.Id, readingSession, new ContextBag());
+            Assert.That(restored.SomeId, Is.EqualTo("Rollback"));
+            readingSession.Dispose();
+        }
+
+        [Test]
+        public async Task Disposing_testable_session_releases_projection_lock()
+        {
+            var options = new NonDurableSagaOptions
+            {
+                ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic,
+                PessimisticLockTimeout = TimeSpan.FromSeconds(5)
+            };
+            var storage = new NonDurableStorage();
+            var saga = new TestSagaData
+            {
+                Id = Guid.NewGuid(),
+                SomeId = "Testable"
+            };
+
+            var firstSession = new TestableNonDurableSynchronizedStorageSession(storage, options);
+            firstSession.AddSaga(saga);
+            var firstResult = await firstSession.FindSagaData<TestSagaData>(new ContextBag(), data => data.Id == saga.Id);
+            Assert.That(firstResult, Is.Not.Null);
+
+            var secondSession = new TestableNonDurableSynchronizedStorageSession(storage, options);
+            var secondFind = secondSession.FindSagaData<TestSagaData>(new ContextBag(), data => data.Id == saga.Id);
+            Assert.That(await Task.WhenAny(secondFind, Task.Delay(200)), Is.Not.SameAs(secondFind));
+
+            firstSession.Dispose();
+
+            var secondResult = await secondFind;
+            Assert.That(secondResult, Is.Not.Null);
+            secondSession.Dispose();
         }
 
         [Test]

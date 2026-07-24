@@ -3,10 +3,15 @@ namespace NServiceBus.Persistence.NonDurable.SagaPersister;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDurableSagaLockingSession
 {
-    public bool TryAcquireSagaLock(Guid sagaId, SagaEntry entry, CancellationToken cancellationToken = default)
+    public TimeSpan PessimisticLockTimeout { get; } = pessimisticLockTimeout > TimeSpan.Zero
+        ? pessimisticLockTimeout
+        : throw new ArgumentOutOfRangeException(nameof(pessimisticLockTimeout), pessimisticLockTimeout, "Pessimistic lock timeout must be greater than zero.");
+
+    public async ValueTask<bool> TryAcquireSagaLock(Guid sagaId, SagaEntry entry, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
@@ -15,9 +20,9 @@ sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDura
             return false;
         }
 
-        if (!lockState.TryAcquire(pessimisticLockTimeout, cancellationToken))
+        if (!await lockState.TryAcquire(timeout, cancellationToken).ConfigureAwait(false))
         {
-            throw new NonDurableSagaLockTimeoutException(sagaId, pessimisticLockTimeout);
+            throw new NonDurableSagaLockTimeoutException(sagaId, PessimisticLockTimeout);
         }
 
         acquiredSagaLocks.Add(lockState.Identity, new SagaLockLease(lockState));
@@ -52,9 +57,6 @@ sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDura
 
     bool sagaLocksReleased;
     readonly Dictionary<Guid, IDisposable> acquiredSagaLocks = [];
-    readonly TimeSpan pessimisticLockTimeout = pessimisticLockTimeout > TimeSpan.Zero
-        ? pessimisticLockTimeout
-        : throw new ArgumentOutOfRangeException(nameof(pessimisticLockTimeout), pessimisticLockTimeout, "Pessimistic lock timeout must be greater than zero.");
 
     sealed class SagaLockLease(SagaLockState lockState) : IDisposable
     {

@@ -3,6 +3,7 @@ namespace NServiceBus.Persistence.NonDurable.SagaPersister;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+using System.Threading.Tasks;
 
 [SuppressMessage(
     "Reliability",
@@ -12,7 +13,8 @@ sealed class SagaLockState
 {
     public Guid Identity { get; } = Guid.NewGuid();
 
-    public bool TryAcquire(TimeSpan timeout, CancellationToken cancellationToken = default) => semaphore.Wait(timeout, cancellationToken);
+    public ValueTask<bool> TryAcquire(TimeSpan timeout, CancellationToken cancellationToken = default) =>
+        new(semaphore.WaitAsync(timeout, cancellationToken));
 
     public void Release() => semaphore.Release();
 

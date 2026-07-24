@@ -2,64 +2,85 @@ namespace NServiceBus.Persistence.NonDurable.SagaPersister;
 
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 
 static class SagaReadLocking
 {
-    public static TSagaData? ReadCurrent<TSagaData>(
+    public static async ValueTask<TSagaData?> ReadCurrent<TSagaData>(
         ConcurrentDictionary<Guid, SagaEntry> sagas,
         INonDurableSagaLockingSession lockingSession,
-        Guid sagaId,
-        SagaEntry entry,
+        Func<SagaReadCandidate?> resolveCandidate,
         Func<SagaEntry, TSagaData?> tryRead,
         Action<Guid, SagaEntry> captureEntry,
+        bool retryOnReadMiss = false,
         CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData
     {
         ArgumentNullException.ThrowIfNull(sagas);
         ArgumentNullException.ThrowIfNull(lockingSession);
-        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(resolveCandidate);
         ArgumentNullException.ThrowIfNull(tryRead);
         ArgumentNullException.ThrowIfNull(captureEntry);
 
-        if (!entry.UsesPessimisticConcurrency)
+        var startedAt = Stopwatch.GetTimestamp();
+
+        while (resolveCandidate() is { } candidate)
         {
-            if (tryRead(entry) is { } sagaData)
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = candidate.Entry;
+
+            if (!entry.UsesPessimisticConcurrency)
             {
-                captureEntry(sagaId, entry);
-                return sagaData;
+                if (!entry.IsCompletionPending && tryRead(entry) is { } optimisticSagaData)
+                {
+                    captureEntry(candidate.SagaId, entry);
+                    return optimisticSagaData;
+                }
+
+                return null;
             }
 
-            return null;
-        }
-
-        var lockAcquired = lockingSession.TryAcquireSagaLock(sagaId, entry, cancellationToken);
-
-        try
-        {
-            if (sagas.TryGetValue(sagaId, out var currentEntry)
-                && entry.HasSameLockIdentity(currentEntry)
-                && tryRead(currentEntry) is { } sagaData)
+            var remaining = lockingSession.PessimisticLockTimeout - Stopwatch.GetElapsedTime(startedAt);
+            if (remaining <= TimeSpan.Zero)
             {
-                captureEntry(sagaId, currentEntry);
-                return sagaData;
-            }
-        }
-        catch
-        {
-            if (lockAcquired)
-            {
-                lockingSession.ReleaseSagaLock(entry);
+                throw new NonDurableSagaLockTimeoutException(candidate.SagaId, lockingSession.PessimisticLockTimeout);
             }
 
-            throw;
-        }
+            var lockAcquired = await lockingSession.TryAcquireSagaLock(candidate.SagaId, entry, remaining, cancellationToken).ConfigureAwait(false);
+            var retainLock = false;
 
-        if (lockAcquired)
-        {
-            lockingSession.ReleaseSagaLock(entry);
+            try
+            {
+                if (sagas.TryGetValue(candidate.SagaId, out var currentEntry)
+                    && entry.HasSameLockIdentity(currentEntry)
+                    && !currentEntry.IsCompletionPending)
+                {
+                    if (tryRead(currentEntry) is { } sagaData)
+                    {
+                        captureEntry(candidate.SagaId, currentEntry);
+                        retainLock = true;
+                        return sagaData;
+                    }
+
+                    if (!retryOnReadMiss)
+                    {
+                        return null;
+                    }
+                }
+            }
+            finally
+            {
+                if (lockAcquired && !retainLock)
+                {
+                    lockingSession.ReleaseSagaLock(entry);
+                }
+            }
         }
 
         return null;
     }
+
+    public readonly record struct SagaReadCandidate(Guid SagaId, SagaEntry Entry);
 }
