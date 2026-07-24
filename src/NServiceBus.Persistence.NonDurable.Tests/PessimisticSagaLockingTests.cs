@@ -232,7 +232,7 @@ class PessimisticSagaLockingTests
     }
 
     [Test]
-    public void Disposing_testable_session_releases_projection_lock()
+    public async Task Disposing_testable_session_releases_projection_lock()
     {
         var options = CreateOptions(TimeSpan.FromMilliseconds(200));
         var storage = new NonDurableStorage();
@@ -241,11 +241,11 @@ class PessimisticSagaLockingTests
         using (var first = new TestableNonDurableSynchronizedStorageSession(storage, options))
         {
             first.AddSaga(saga);
-            Assert.That(first.GetSagaData<TestSagaData>(new ContextBag(), static data => data.SomeId == "testable"), Is.Not.Null);
+            Assert.That(await first.FindSagaData<TestSagaData>(new ContextBag(), static data => data.SomeId == "testable"), Is.Not.Null);
         }
 
         using var second = new TestableNonDurableSynchronizedStorageSession(storage, options);
-        Assert.That(second.GetSagaData<TestSagaData>(new ContextBag(), static data => data.SomeId == "testable"), Is.Not.Null);
+        Assert.That(await second.FindSagaData<TestSagaData>(new ContextBag(), static data => data.SomeId == "testable"), Is.Not.Null);
     }
 
     static async Task AssertCanRead(

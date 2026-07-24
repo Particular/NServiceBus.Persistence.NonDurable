@@ -50,12 +50,14 @@ namespace NServiceBus.Persistence.NonDurable
             where TSagaData :  class, NServiceBus.IContainSagaData;
         System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
-        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
-            "ing and will be removed in the next major version.")]
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
-        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
-            "ing and will be removed in the next major version.")]
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
     }
@@ -80,12 +82,14 @@ namespace NServiceBus.Testing
             where TSagaData :  class, NServiceBus.IContainSagaData { }
         public System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
-        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
-            "ing and will be removed in the next major version.")]
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
-        [System.Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous lock" +
-            "ing and will be removed in the next major version.")]
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         public TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
     }

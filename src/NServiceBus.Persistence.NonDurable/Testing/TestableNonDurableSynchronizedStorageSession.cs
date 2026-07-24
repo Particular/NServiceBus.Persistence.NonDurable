@@ -7,6 +7,7 @@ using Extensibility;
 using Persistence;
 using Persistence.NonDurable;
 using Persistence.NonDurable.SagaPersister;
+using Particular.Obsoletes;
 
 /// <summary>
 /// A fake implementation of the NonDurable synchronized storage session for testing purposes.
@@ -59,13 +60,23 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
         NonDurableSagaDataProjection.FindSagaData(storage, this, context, state, predicate, cancellationToken);
 
     /// <inheritdoc />
-    [Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous locking and will be removed in the next major version.")]
+    [ObsoleteMetadata(
+        Message = "GetSagaData performs synchronous-over-asynchronous locking",
+        ReplacementTypeOrMember = "FindSagaData",
+        RemoveInVersion = "5",
+        TreatAsErrorFromVersion = "4")]
+    [Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use 'FindSagaData' instead. Will be treated as an error from version 4.0.0. Will be removed in version 5.0.0.", false)]
     public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         FindSagaData(context, predicate, cancellationToken).GetAwaiter().GetResult();
 
     /// <inheritdoc />
-    [Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous locking and will be removed in the next major version.")]
+    [ObsoleteMetadata(
+        Message = "GetSagaData performs synchronous-over-asynchronous locking",
+        ReplacementTypeOrMember = "FindSagaData",
+        RemoveInVersion = "5",
+        TreatAsErrorFromVersion = "4")]
+    [Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use 'FindSagaData' instead. Will be treated as an error from version 4.0.0. Will be removed in version 5.0.0.", false)]
     public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         FindSagaData(context, state, predicate, cancellationToken).GetAwaiter().GetResult();

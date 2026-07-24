@@ -148,12 +148,10 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         where TSagaData : class, IContainSagaData =>
         NonDurableSagaDataProjection.FindSagaData(storage, this, context, state, predicate, cancellationToken);
 
-    [Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous locking and will be removed in the next major version.")]
     public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         FindSagaData(context, predicate, cancellationToken).GetAwaiter().GetResult();
 
-    [Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous locking and will be removed in the next major version.")]
     public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
         FindSagaData(context, state, predicate, cancellationToken).GetAwaiter().GetResult();

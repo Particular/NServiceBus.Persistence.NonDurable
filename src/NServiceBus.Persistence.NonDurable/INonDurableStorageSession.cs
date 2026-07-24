@@ -4,6 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Extensibility;
+using Particular.Obsoletes;
 
 /// <summary>
 /// Provides access to NonDurable persistence synchronized storage operations.
@@ -52,7 +53,12 @@ public interface INonDurableStorageSession
     /// <param name="predicate">The predicate used to select the saga data.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The first saga data instance that matches the predicate, or <c>null</c> when no match is found.</returns>
-    [Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous locking and will be removed in the next major version.")]
+    [ObsoleteMetadata(
+        Message = "GetSagaData performs synchronous-over-asynchronous locking",
+        ReplacementTypeOrMember = "FindSagaData",
+        RemoveInVersion = "5",
+        TreatAsErrorFromVersion = "4")]
+    [Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use 'FindSagaData' instead. Will be treated as an error from version 4.0.0. Will be removed in version 5.0.0.", false)]
     TSagaData? GetSagaData<TSagaData>(
         IReadOnlyContextBag context,
         Func<TSagaData, bool> predicate,
@@ -72,7 +78,12 @@ public interface INonDurableStorageSession
     /// <param name="predicate">The predicate used to select the saga data.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The first saga data instance that matches the predicate, or <c>null</c> when no match is found.</returns>
-    [Obsolete("Use FindSagaData instead. GetSagaData performs synchronous-over-asynchronous locking and will be removed in the next major version.")]
+    [ObsoleteMetadata(
+        Message = "GetSagaData performs synchronous-over-asynchronous locking",
+        ReplacementTypeOrMember = "FindSagaData",
+        RemoveInVersion = "5",
+        TreatAsErrorFromVersion = "4")]
+    [Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use 'FindSagaData' instead. Will be treated as an error from version 4.0.0. Will be removed in version 5.0.0.", false)]
     TSagaData? GetSagaData<TSagaData, TState>(
         IReadOnlyContextBag context,
         TState state,
