@@ -8,12 +8,13 @@ using System.Threading.Tasks;
 
 static class SagaReadLocking
 {
-    public static async ValueTask<TSagaData?> ReadCurrent<TSagaData>(
+    public static async ValueTask<TSagaData?> ReadCurrent<TSagaData, TState>(
         ConcurrentDictionary<Guid, SagaEntry> sagas,
         INonDurableSagaLockingSession lockingSession,
-        Func<SagaReadCandidate?> resolveCandidate,
-        Func<SagaEntry, TSagaData?> tryRead,
-        Action<Guid, SagaEntry> captureEntry,
+        TState state,
+        Func<TState, SagaReadCandidate?> resolveCandidate,
+        Func<SagaEntry, TState, TSagaData?> tryRead,
+        Action<Guid, SagaEntry, TState> captureEntry,
         bool retryOnReadMiss = false,
         CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData
@@ -26,16 +27,16 @@ static class SagaReadLocking
 
         var startedAt = Stopwatch.GetTimestamp();
 
-        while (resolveCandidate() is { } candidate)
+        while (resolveCandidate(state) is { } candidate)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var entry = candidate.Entry;
 
             if (!entry.UsesPessimisticConcurrency)
             {
-                if (!entry.IsCompletionPending && tryRead(entry) is { } optimisticSagaData)
+                if (!entry.IsCompletionPending && tryRead(entry, state) is { } optimisticSagaData)
                 {
-                    captureEntry(candidate.SagaId, entry);
+                    captureEntry(candidate.SagaId, entry, state);
                     return optimisticSagaData;
                 }
 
@@ -57,9 +58,9 @@ static class SagaReadLocking
                     && entry.HasSameLockIdentity(currentEntry)
                     && !currentEntry.IsCompletionPending)
                 {
-                    if (tryRead(currentEntry) is { } sagaData)
+                    if (tryRead(currentEntry, state) is { } sagaData)
                     {
-                        captureEntry(candidate.SagaId, currentEntry);
+                        captureEntry(candidate.SagaId, currentEntry, state);
                         retainLock = true;
                         return sagaData;
                     }

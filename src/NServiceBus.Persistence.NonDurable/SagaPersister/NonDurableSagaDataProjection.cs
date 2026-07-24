@@ -1,6 +1,7 @@
 namespace NServiceBus.Persistence.NonDurable;
 
 using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Extensibility;
@@ -42,38 +43,47 @@ static class NonDurableSagaDataProjection
             throw new InvalidOperationException("The context must be a mutable ContextBag.");
         }
 
-        SagaReadLocking.SagaReadCandidate? ResolveCandidate()
-        {
-            foreach (var (sagaId, entry) in storage.Sagas)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (entry.IsCompletionPending || entry.SagaDataType != typeof(TSagaData))
-                {
-                    continue;
-                }
-
-                var sagaData = (TSagaData)entry.GetSagaCopy();
-                if (predicate(sagaData, state))
-                {
-                    return new(sagaId, entry);
-                }
-            }
-
-            return null;
-        }
+        var readState = new ProjectionReadState<TSagaData, TState>(storage.Sagas, contextBag, state, predicate, cancellationToken);
 
         return await SagaReadLocking.ReadCurrent(
             storage.Sagas,
             lockingSession,
-            ResolveCandidate,
-            liveEntry =>
+            readState,
+            static readState =>
+            {
+                foreach (var (sagaId, entry) in readState.Sagas)
+                {
+                    readState.CancellationToken.ThrowIfCancellationRequested();
+
+                    if (entry.IsCompletionPending || entry.SagaDataType != typeof(TSagaData))
+                    {
+                        continue;
+                    }
+
+                    var sagaData = (TSagaData)entry.GetSagaCopy();
+                    if (readState.Predicate(sagaData, readState.State))
+                    {
+                        return new(sagaId, entry);
+                    }
+                }
+
+                return null;
+            },
+            static (liveEntry, readState) =>
             {
                 var currentSagaData = (TSagaData)liveEntry.GetSagaCopy();
-                return predicate(currentSagaData, state) ? currentSagaData : null;
+                return readState.Predicate(currentSagaData, readState.State) ? currentSagaData : null;
             },
-            (capturedSagaId, capturedEntry) => NonDurableSagaPersister.SetEntry(contextBag, capturedSagaId, capturedEntry),
+            static (capturedSagaId, capturedEntry, readState) => NonDurableSagaPersister.SetEntry(readState.Context, capturedSagaId, capturedEntry),
             retryOnReadMiss: true,
             cancellationToken).ConfigureAwait(false);
     }
+
+    readonly record struct ProjectionReadState<TSagaData, TState>(
+        ConcurrentDictionary<Guid, SagaEntry> Sagas,
+        ContextBag Context,
+        TState State,
+        Func<TSagaData, TState, bool> Predicate,
+        CancellationToken CancellationToken)
+        where TSagaData : class, IContainSagaData;
 }

@@ -91,11 +91,12 @@ class NonDurableSagaPersister : ISagaPersister
         var sagaData = await SagaReadLocking.ReadCurrent(
             sagas,
             (INonDurableSagaLockingSession)session,
-            () => sagas.TryGetValue(sagaId, out var entry)
-                ? new(sagaId, entry)
+            (Sagas: sagas, SagaId: sagaId, Context: context),
+            static state => state.Sagas.TryGetValue(state.SagaId, out var entry)
+                ? new(state.SagaId, entry)
                 : null,
-            static currentEntry => (TSagaData)currentEntry.GetSagaCopy(),
-            (capturedSagaId, capturedEntry) => SetEntry(context, capturedSagaId, capturedEntry),
+            static (currentEntry, _) => (TSagaData)currentEntry.GetSagaCopy(),
+            static (capturedSagaId, capturedEntry, state) => SetEntry(state.Context, capturedSagaId, capturedEntry),
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (sagaData is not null)
@@ -119,13 +120,14 @@ class NonDurableSagaPersister : ISagaPersister
         var sagaData = await SagaReadLocking.ReadCurrent(
             sagas,
             (INonDurableSagaLockingSession)session,
-            () => byCorrelationId.TryGetValue(key, out var id) && sagas.TryGetValue(id, out var entry)
+            (Sagas: sagas, ByCorrelationId: byCorrelationId, Key: key, Context: context),
+            static state => state.ByCorrelationId.TryGetValue(state.Key, out var id) && state.Sagas.TryGetValue(id, out var entry)
                 ? new(id, entry)
                 : null,
-            currentEntry => currentEntry.CorrelationId.Equals(key)
+            static (currentEntry, state) => currentEntry.CorrelationId.Equals(state.Key)
                 ? (TSagaData)currentEntry.GetSagaCopy()
                 : null,
-            (capturedSagaId, capturedEntry) => SetEntry(context, capturedSagaId, capturedEntry),
+            static (capturedSagaId, capturedEntry, state) => SetEntry(state.Context, capturedSagaId, capturedEntry),
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (sagaData is not null)
