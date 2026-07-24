@@ -14,7 +14,10 @@ class NonDurableSagaPersister : ISagaPersister
 {
     public NonDurableSagaPersister(NonDurableStorage storage, NonDurableSagaOptions options)
     {
-        this.options = options;
+        this.options = options ?? throw new ArgumentNullException(nameof(options));
+        ArgumentNullException.ThrowIfNull(storage);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.PessimisticLockTimeout, TimeSpan.Zero);
+
         sagas = storage.Sagas;
         byCorrelationId = storage.SagaCorrelationIds;
     }
@@ -37,7 +40,7 @@ class NonDurableSagaPersister : ISagaPersister
             var correlationId = correlationProperty != SagaCorrelationProperty.None
                 ? new CorrelationId(sagaData.GetType(), correlationProperty)
                 : NoCorrelationId;
-            var entry = new SagaEntry(sagaData, correlationId, version: 1, options.JsonSerializerOptions);
+            var entry = new SagaEntry(sagaData, correlationId, version: 1, options.ConcurrencyMode, options.JsonSerializerOptions);
 
             ((NonDurableSynchronizedStorageSession)session).Enlist(
                 new SaveOperationState(sagas, byCorrelationId, sagaData.Id, correlationId, entry),
@@ -81,46 +84,62 @@ class NonDurableSagaPersister : ISagaPersister
         }
     }
 
-    public Task<TSagaData> Get<TSagaData>(Guid sagaId, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
+    public async Task<TSagaData> Get<TSagaData>(Guid sagaId, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData
     {
         using var activity = NonDurablePersistenceTracing.StartSagaGetById(sagaId);
-        if (sagas.TryGetValue(sagaId, out var value))
-        {
-            SetEntry(context, sagaId, value);
+        var sagaData = await SagaReadLocking.ReadCurrent(
+            sagas,
+            (INonDurableSagaLockingSession)session,
+            (Sagas: sagas, SagaId: sagaId, Context: context),
+            static state => state.Sagas.TryGetValue(state.SagaId, out var entry)
+                ? new(state.SagaId, entry)
+                : null,
+            static (currentEntry, _) => (TSagaData)currentEntry.GetSagaCopy(),
+            static (capturedSagaId, capturedEntry, state) => SetEntry(state.Context, capturedSagaId, capturedEntry),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
-            var data = value.GetSagaCopy();
+        if (sagaData is not null)
+        {
             NonDurablePersistenceTracing.AddHitEvent(activity);
             NonDurablePersistenceTracing.MarkSuccess(activity);
-            return Task.FromResult((TSagaData)data);
+            return sagaData;
         }
 
         NonDurablePersistenceTracing.AddMissEvent(activity);
         NonDurablePersistenceTracing.MarkSuccess(activity);
-        return CachedSagaDataTask<TSagaData>.Default!;
+        return default!;
     }
 
-    public Task<TSagaData> Get<TSagaData>(string propertyName, object propertyValue, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
+    public async Task<TSagaData> Get<TSagaData>(string propertyName, object propertyValue, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData
     {
         using var activity = NonDurablePersistenceTracing.StartSagaGetByProperty(typeof(TSagaData), propertyName, propertyValue);
         var key = new CorrelationId(typeof(TSagaData), propertyName, propertyValue);
 
-        if (byCorrelationId.TryGetValue(key, out var id))
+        var sagaData = await SagaReadLocking.ReadCurrent(
+            sagas,
+            (INonDurableSagaLockingSession)session,
+            (Sagas: sagas, ByCorrelationId: byCorrelationId, Key: key, Context: context),
+            static state => state.ByCorrelationId.TryGetValue(state.Key, out var id) && state.Sagas.TryGetValue(id, out var entry)
+                ? new(id, entry)
+                : null,
+            static (currentEntry, state) => currentEntry.CorrelationId.Equals(state.Key)
+                ? (TSagaData)currentEntry.GetSagaCopy()
+                : null,
+            static (capturedSagaId, capturedEntry, state) => SetEntry(state.Context, capturedSagaId, capturedEntry),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        if (sagaData is not null)
         {
-            if (sagas.TryGetValue(id, out var value))
-            {
-                SetEntry(context, id, value);
-                var data = value.GetSagaCopy();
-                NonDurablePersistenceTracing.AddHitEvent(activity);
-                NonDurablePersistenceTracing.MarkSuccess(activity);
-                return Task.FromResult((TSagaData)data);
-            }
+            NonDurablePersistenceTracing.AddHitEvent(activity);
+            NonDurablePersistenceTracing.MarkSuccess(activity);
+            return sagaData;
         }
 
         NonDurablePersistenceTracing.AddMissEvent(activity);
         NonDurablePersistenceTracing.MarkSuccess(activity);
-        return CachedSagaDataTask<TSagaData>.Default!;
+        return default!;
     }
 
     public Task Update(IContainSagaData sagaData, ISynchronizedStorageSession session, ContextBag context, CancellationToken cancellationToken = default)
@@ -141,17 +160,7 @@ class NonDurableSagaPersister : ISagaPersister
                         throw new Exception($"NonDurableSagaPersister concurrency violation: saga entity Id[{state.SagaId}] was modified by another process.");
                     }
                 },
-                static state =>
-                {
-                    // Restore the original entry by reading the live value and swapping it back.
-                    // Comparing against the live value (rather than the captured updated entry) keeps
-                    // rollback correct under DTC two-phase commit, where the prepare and rollback
-                    // phases are driven by the distributed transaction coordinator on a separate thread.
-                    if (state.Sagas.TryGetValue(state.SagaId, out var currentEntry))
-                    {
-                        state.Sagas.TryUpdate(state.SagaId, state.Entry, currentEntry);
-                    }
-                },
+                static state => state.Sagas.TryUpdate(state.SagaId, state.Entry, state.UpdatedEntry),
                 activity);
             NonDurablePersistenceTracing.AddStagedEvent(activity);
 
@@ -172,31 +181,33 @@ class NonDurableSagaPersister : ISagaPersister
         try
         {
             var entry = GetEntry(context, sagaData.Id);
+            var completionPendingEntry = entry.MarkCompletionPending();
+            var synchronizedStorageSession = (NonDurableSynchronizedStorageSession)session;
+            var operationState = new CompleteOperationState(sagas, byCorrelationId, sagaData.Id, entry, completionPendingEntry);
 
-            ((NonDurableSynchronizedStorageSession)session).Enlist(
-                new CompleteOperationState(sagas, byCorrelationId, sagaData.Id, entry),
+            synchronizedStorageSession.Enlist(
+                operationState,
                 static state =>
                 {
-                    if (!state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.Entry)))
+                    if (!state.Sagas.TryUpdate(state.SagaId, state.CompletionPendingEntry, state.Entry))
                     {
                         throw new Exception("Saga can't be completed as it was updated by another process.");
                     }
-
-                    if (!state.Entry.CorrelationId.Equals(NoCorrelationId))
-                    {
-                        state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.Entry.CorrelationId, state.SagaId));
-                    }
                 },
-                static state =>
-                {
-                    state.Sagas.TryAdd(state.SagaId, state.Entry);
-
-                    if (!state.Entry.CorrelationId.Equals(NoCorrelationId))
-                    {
-                        state.ByCorrelationId.TryAdd(state.Entry.CorrelationId, state.SagaId);
-                    }
-                },
+                static state => state.Sagas.TryUpdate(state.SagaId, state.Entry, state.CompletionPendingEntry),
                 activity);
+
+            // The completion marker keeps the saga ID, correlation ID and lock lineage reserved
+            // through ambient prepare. A committed transaction leaves the marker in place for this
+            // callback to remove; rollback restores the original entry before this callback runs.
+            synchronizedStorageSession.OnCompleted(operationState, static state =>
+            {
+                if (state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.CompletionPendingEntry))
+                    && !state.Entry.CorrelationId.Equals(NoCorrelationId))
+                {
+                    state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.Entry.CorrelationId, state.SagaId));
+                }
+            });
             NonDurablePersistenceTracing.AddStagedEvent(activity);
 
             return Task.CompletedTask;
@@ -229,7 +240,7 @@ class NonDurableSagaPersister : ISagaPersister
         // Custom finders may return saga data that was not loaded via Get, so no entry was
         // captured in the context. Fall back to the current live entry so the optimistic-
         // concurrency compare still resolves against committed state
-        if (sagas.TryGetValue(sagaDataId, out var liveEntry))
+        if (sagas.TryGetValue(sagaDataId, out var liveEntry) && !liveEntry.IsCompletionPending)
         {
             return liveEntry;
         }
@@ -258,7 +269,8 @@ class NonDurableSagaPersister : ISagaPersister
         ConcurrentDictionary<Guid, SagaEntry> Sagas,
         ConcurrentDictionary<CorrelationId, Guid> ByCorrelationId,
         Guid SagaId,
-        SagaEntry Entry);
+        SagaEntry Entry,
+        SagaEntry CompletionPendingEntry);
 
     const string ContextKey = "NServiceBus.NonDurableSagaPersistence.Sagas";
     static readonly CorrelationId NoCorrelationId = new CorrelationId(typeof(object), "", new object());

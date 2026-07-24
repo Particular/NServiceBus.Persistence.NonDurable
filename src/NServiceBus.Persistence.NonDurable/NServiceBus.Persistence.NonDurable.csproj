@@ -13,11 +13,13 @@
   </ItemGroup>
 
   <ItemGroup Label="Private dependencies">
+    <PackageReference Include="Particular.Obsoletes" Version="1.1.0" PrivateAssets="All" ExcludeAssets="runtime" />
     <PackageReference Include="Particular.Packaging" Version="4.5.0" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="NServiceBus.Persistence.NonDurable.PersistenceTests" Key="$(NServiceBusTestsKey)" />
+    <InternalsVisibleTo Include="NServiceBus.Persistence.NonDurable.PessimisticLock.PersistenceTests" Key="$(NServiceBusTestsKey)" />
     <InternalsVisibleTo Include="NServiceBus.Persistence.NonDurable.Tests" Key="$(NServiceBusTestsKey)" />
   </ItemGroup>
 

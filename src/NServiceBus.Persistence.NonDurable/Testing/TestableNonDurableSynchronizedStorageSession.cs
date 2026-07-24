@@ -2,10 +2,12 @@ namespace NServiceBus.Testing;
 
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Extensibility;
 using Persistence;
 using Persistence.NonDurable;
 using Persistence.NonDurable.SagaPersister;
+using Particular.Obsoletes;
 
 /// <summary>
 /// A fake implementation of the NonDurable synchronized storage session for testing purposes.
@@ -13,7 +15,7 @@ using Persistence.NonDurable.SagaPersister;
 /// <remarks>
 /// Initializes a new instance of <see cref="TestableNonDurableSynchronizedStorageSession" /> using the specified storage instance and saga options.
 /// </remarks>
-public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage storage, NonDurableSagaOptions sagaOptions) : ISynchronizedStorageSession, INonDurableStorageSession
+public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage storage, NonDurableSagaOptions sagaOptions) : ISynchronizedStorageSession, INonDurableStorageSession, INonDurableSagaLockingSession, IDisposable, IAsyncDisposable
 {
     /// <summary>
     /// Initializes a new instance of <see cref="TestableNonDurableSynchronizedStorageSession" /> using a new <see cref="NonDurableStorage" /> instance and default saga options.
@@ -44,19 +46,63 @@ public class TestableNonDurableSynchronizedStorageSession(NonDurableStorage stor
         ArgumentNullException.ThrowIfNull(sagaData);
 
         var noCorrelationId = new CorrelationId(typeof(object), string.Empty, new object());
-        storage.Sagas[sagaData.Id] = new SagaEntry(sagaData, noCorrelationId, version: 1, sagaOptions.JsonSerializerOptions);
+        storage.Sagas[sagaData.Id] = new SagaEntry(sagaData, noCorrelationId, version: 1, sagaOptions.ConcurrencyMode, sagaOptions.JsonSerializerOptions);
     }
 
     /// <inheritdoc />
-    public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
+    public Task<TSagaData?> FindSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
+        NonDurableSagaDataProjection.FindSagaData(storage, this, context, predicate, cancellationToken);
 
     /// <inheritdoc />
+    public Task<TSagaData?> FindSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.FindSagaData(storage, this, context, state, predicate, cancellationToken);
+
+    /// <inheritdoc />
+    [ObsoleteMetadata(
+        Message = "GetSagaData performs synchronous-over-asynchronous locking",
+        ReplacementTypeOrMember = "FindSagaData",
+        RemoveInVersion = "5",
+        TreatAsErrorFromVersion = "4")]
+    [Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use 'FindSagaData' instead. Will be treated as an error from version 4.0.0. Will be removed in version 5.0.0.", false)]
+    public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        FindSagaData(context, predicate, cancellationToken).GetAwaiter().GetResult();
+
+    /// <inheritdoc />
+    [ObsoleteMetadata(
+        Message = "GetSagaData performs synchronous-over-asynchronous locking",
+        ReplacementTypeOrMember = "FindSagaData",
+        RemoveInVersion = "5",
+        TreatAsErrorFromVersion = "4")]
+    [Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use 'FindSagaData' instead. Will be treated as an error from version 4.0.0. Will be removed in version 5.0.0.", false)]
     public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
+        FindSagaData(context, state, predicate, cancellationToken).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Releases any pessimistic saga locks acquired by this test session.
+    /// </summary>
+    public void Dispose() => sagaLockingSession.ReleaseAllSagaLocks();
+
+    /// <summary>
+    /// Releases any pessimistic saga locks acquired by this test session.
+    /// </summary>
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return default;
+    }
+
+    TimeSpan INonDurableSagaLockingSession.PessimisticLockTimeout => sagaLockingSession.PessimisticLockTimeout;
+
+    ValueTask<bool> INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, SagaEntry entry, TimeSpan timeout, CancellationToken cancellationToken) =>
+        sagaLockingSession.TryAcquireSagaLock(sagaId, entry, timeout, cancellationToken);
+
+    void INonDurableSagaLockingSession.ReleaseSagaLock(SagaEntry entry) => sagaLockingSession.ReleaseSagaLock(entry);
 
     readonly NonDurableStorage storage = storage ?? throw new ArgumentNullException(nameof(storage));
     readonly NonDurableSagaOptions sagaOptions = sagaOptions ?? throw new ArgumentNullException(nameof(sagaOptions));
+    readonly SagaLockingSessionState sagaLockingSession = new((sagaOptions ?? throw new ArgumentNullException(nameof(sagaOptions))).PessimisticLockTimeout);
 }

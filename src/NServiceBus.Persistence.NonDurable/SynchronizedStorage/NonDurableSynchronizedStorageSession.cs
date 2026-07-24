@@ -8,12 +8,24 @@ using System.Transactions;
 using Extensibility;
 using Outbox;
 using Persistence;
+using SagaPersister;
 using Transport;
 
-class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : ICompletableSynchronizedStorageSession, INonDurableStorageSession
+class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSession, INonDurableStorageSession, INonDurableSagaLockingSession
 {
-    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedStorage)
+    public NonDurableSynchronizedStorageSession() : this(NonDurableStorageRuntime.SharedStorage, new NonDurableSagaOptions())
     {
+    }
+
+    public NonDurableSynchronizedStorageSession(NonDurableStorage storage) : this(storage, new NonDurableSagaOptions())
+    {
+    }
+
+    public NonDurableSynchronizedStorageSession(NonDurableStorage storage, NonDurableSagaOptions sagaOptions)
+    {
+        this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        ArgumentNullException.ThrowIfNull(sagaOptions);
+        sagaLockingSession = new SagaLockingSessionState(sagaOptions.PessimisticLockTimeout);
     }
 
     public NonDurableStorageTransaction? Transaction { get; private set; }
@@ -30,9 +42,14 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
             if (ownsTransaction && !enlistedInAmbientTransaction)
             {
                 tx.DisposeTrackedActivities();
+                CompleteSession();
             }
 
             Transaction = null;
+        }
+        else if (!enlistedInAmbientTransaction && !waitsForOutboxCompletion)
+        {
+            CompleteSession();
         }
     }
 
@@ -49,6 +66,8 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         {
             Transaction = nonDurableOutboxTransaction.Transaction;
             ownsTransaction = false;
+            waitsForOutboxCompletion = true;
+            nonDurableOutboxTransaction.OnCompleted(this, static session => session.CompleteSession());
             return new ValueTask<bool>(true);
         }
 
@@ -85,7 +104,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         Transaction = new NonDurableStorageTransaction();
         ownsTransaction = true;
         enlistedInAmbientTransaction = true;
-        enlistmentNotification = new EnlistmentNotification(Transaction);
+        enlistmentNotification = new EnlistmentNotification(Transaction, CompleteSession);
         ambientTransaction.EnlistVolatile(enlistmentNotification, EnlistmentOptions.None);
         return new ValueTask<bool>(true);
     }
@@ -101,7 +120,14 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
     {
         if (ownsTransaction && !enlistedInAmbientTransaction && Transaction is not null)
         {
-            Transaction.Commit();
+            try
+            {
+                Transaction.Commit();
+            }
+            finally
+            {
+                CompleteSession();
+            }
         }
 
         return Task.CompletedTask;
@@ -114,18 +140,51 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         Transaction.Enlist(state, apply, rollback, activity);
     }
 
+    public Task<TSagaData?> FindSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.FindSagaData(storage, this, context, predicate, cancellationToken);
+
+    public Task<TSagaData?> FindSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
+        where TSagaData : class, IContainSagaData =>
+        NonDurableSagaDataProjection.FindSagaData(storage, this, context, state, predicate, cancellationToken);
+
     public TSagaData? GetSagaData<TSagaData>(IReadOnlyContextBag context, Func<TSagaData, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, predicate, cancellationToken);
+        FindSagaData(context, predicate, cancellationToken).GetAwaiter().GetResult();
 
     public TSagaData? GetSagaData<TSagaData, TState>(IReadOnlyContextBag context, TState state, Func<TSagaData, TState, bool> predicate, CancellationToken cancellationToken = default)
         where TSagaData : class, IContainSagaData =>
-        NonDurableSagaDataProjection.GetSagaData(storage, context, state, predicate, cancellationToken);
+        FindSagaData(context, state, predicate, cancellationToken).GetAwaiter().GetResult();
+
+    internal void OnCompleted<TState>(TState state, Action<TState> callback) => completionCallbacks.Add(state, callback);
+
+    TimeSpan INonDurableSagaLockingSession.PessimisticLockTimeout => sagaLockingSession.PessimisticLockTimeout;
+
+    ValueTask<bool> INonDurableSagaLockingSession.TryAcquireSagaLock(Guid sagaId, SagaEntry entry, TimeSpan timeout, CancellationToken cancellationToken) =>
+        sagaLockingSession.TryAcquireSagaLock(sagaId, entry, timeout, cancellationToken);
+
+    void INonDurableSagaLockingSession.ReleaseSagaLock(SagaEntry entry) => sagaLockingSession.ReleaseSagaLock(entry);
+
+    void CompleteSession()
+    {
+        try
+        {
+            completionCallbacks.Run();
+        }
+        finally
+        {
+            sagaLockingSession.ReleaseAllSagaLocks();
+        }
+    }
 
     bool ownsTransaction;
     bool enlistedInAmbientTransaction;
+    bool waitsForOutboxCompletion;
+    readonly NonDurableStorage storage;
+    readonly SagaLockingSessionState sagaLockingSession;
+    readonly CompletionCallbacks completionCallbacks = new();
 
-    internal class EnlistmentNotification(NonDurableStorageTransaction transaction) : IEnlistmentNotification
+    internal class EnlistmentNotification(NonDurableStorageTransaction transaction, Action releaseSagaLocks) : IEnlistmentNotification
     {
         public TaskCompletionSource TransactionCompletionSource { get; } = new();
 
@@ -145,6 +204,7 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
 
         public void Commit(Enlistment enlistment)
         {
+            releaseSagaLocks();
             enlistment.Done();
             TransactionCompletionSource.SetResult();
         }
@@ -152,10 +212,15 @@ class NonDurableSynchronizedStorageSession(NonDurableStorage storage) : IComplet
         public void Rollback(Enlistment enlistment)
         {
             transaction.Rollback();
+            releaseSagaLocks();
             enlistment.Done();
             TransactionCompletionSource.SetResult();
         }
 
-        public void InDoubt(Enlistment enlistment) => enlistment.Done();
+        public void InDoubt(Enlistment enlistment)
+        {
+            releaseSagaLocks();
+            enlistment.Done();
+        }
     }
 }

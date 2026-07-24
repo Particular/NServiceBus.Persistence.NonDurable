@@ -14,6 +14,6 @@ sealed class NonDurableTransactionalStorageFeature : Feature
         NonDurablePersistenceOptions persistenceOptions = context.Settings.Get<NonDurablePersistenceOptions>();
         NonDurableStorageRuntime.Configure(context.Services, persistenceOptions);
 
-        context.Services.AddScoped<ICompletableSynchronizedStorageSession>(sp => new NonDurableSynchronizedStorageSession(sp.GetRequiredService<NonDurableStorage>()));
+        context.Services.AddScoped<ICompletableSynchronizedStorageSession>(sp => new NonDurableSynchronizedStorageSession(sp.GetRequiredService<NonDurableStorage>(), persistenceOptions.Saga));
     }
 }

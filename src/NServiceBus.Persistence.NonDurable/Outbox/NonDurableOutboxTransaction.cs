@@ -20,8 +20,21 @@ class NonDurableOutboxTransaction : IOutboxTransaction
 
     public Task Commit(CancellationToken cancellationToken = default)
     {
-        Transaction?.Commit();
+        try
+        {
+            Transaction?.Commit();
+        }
+        finally
+        {
+            completionCallbacks.Run();
+        }
+
         return Task.CompletedTask;
+    }
+
+    internal void OnCompleted<TState>(TState state, Action<TState> callback)
+    {
+        completionCallbacks.Add(state, callback);
     }
 
     public void Dispose()
@@ -29,6 +42,7 @@ class NonDurableOutboxTransaction : IOutboxTransaction
         if (Transaction is { } tx)
         {
             tx.DisposeTrackedActivities();
+            completionCallbacks.Run();
             Transaction = null;
         }
     }
@@ -38,4 +52,6 @@ class NonDurableOutboxTransaction : IOutboxTransaction
         Dispose();
         return default;
     }
+
+    readonly CompletionCallbacks completionCallbacks = new();
 }

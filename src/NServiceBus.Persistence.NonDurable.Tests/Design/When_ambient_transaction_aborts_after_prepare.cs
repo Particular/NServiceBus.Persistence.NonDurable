@@ -141,6 +141,41 @@ public class When_ambient_transaction_aborts_after_prepare
     }
 
     [Test]
+    public async Task Should_not_overwrite_a_later_committed_update_when_prepared_update_rolls_back()
+    {
+        var persister = new NonDurableSagaPersister();
+        var saga = new Saga { Id = Guid.NewGuid(), SomeId = "x", LastUpdatedBy = "Original" };
+        var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);
+
+        var saveSession = new NonDurableSynchronizedStorageSession();
+        var saveContext = new ContextBag();
+        await saveSession.Open(saveContext);
+        await persister.Save(saga, correlation, saveSession, saveContext);
+        await saveSession.CompleteAsync();
+
+        var preparedSession = new NonDurableSynchronizedStorageSession();
+        var preparedContext = new ContextBag();
+        await preparedSession.Open(preparedContext);
+        var preparedSaga = await persister.Get<Saga>(saga.Id, preparedSession, preparedContext);
+        preparedSaga.LastUpdatedBy = "Prepared";
+        await persister.Update(preparedSaga, preparedSession, preparedContext);
+        preparedSession.Transaction!.Commit();
+
+        var laterSession = new NonDurableSynchronizedStorageSession();
+        var laterContext = new ContextBag();
+        await laterSession.Open(laterContext);
+        var laterSaga = await persister.Get<Saga>(saga.Id, laterSession, laterContext);
+        laterSaga.LastUpdatedBy = "Later commit";
+        await persister.Update(laterSaga, laterSession, laterContext);
+        await laterSession.CompleteAsync();
+
+        preparedSession.Transaction.Rollback();
+
+        var afterRollback = await ReadBack(persister, saga.Id);
+        Assert.That(afterRollback.LastUpdatedBy, Is.EqualTo("Later commit"));
+    }
+
+    [Test]
     public async Task Should_restore_saga_when_completed_then_transaction_aborted()
     {
         var persister = new NonDurableSagaPersister();
@@ -168,6 +203,67 @@ public class When_ambient_transaction_aborts_after_prepare
         var afterAbort = await ReadBack(persister, saga.Id);
         Assert.That(afterAbort, Is.Not.Null, "abort should restore the completed saga");
         Assert.That(afterAbort!.LastUpdatedBy, Is.EqualTo("Unchanged"));
+    }
+
+    [Test]
+    public async Task Should_reserve_completed_saga_lineage_until_transaction_outcome()
+    {
+        var options = new NonDurableSagaOptions
+        {
+            ConcurrencyMode = NonDurableSagaConcurrencyMode.Pessimistic
+        };
+        var storage = new NonDurableStorage();
+        var persister = new NonDurableSagaPersister(storage, options);
+        var saga = new Saga { Id = Guid.NewGuid(), SomeId = "reserved", LastUpdatedBy = "Original" };
+        var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);
+
+        using (var saveSession = new NonDurableSynchronizedStorageSession(storage, options))
+        {
+            await saveSession.Open(new ContextBag());
+            await persister.Save(saga, correlation, saveSession, new ContextBag());
+            await saveSession.CompleteAsync();
+        }
+
+        using var completingSession = new NonDurableSynchronizedStorageSession(storage, options);
+        var completingContext = new ContextBag();
+        await completingSession.Open(completingContext);
+        await persister.Get<Saga>(saga.Id, completingSession, completingContext);
+        await persister.Complete(saga, completingSession, completingContext);
+
+        // Simulate DTC prepare. Completion may be hidden from readers, but the ID and correlation
+        // must remain reserved until the coordinator supplies the final outcome.
+        completingSession.Transaction!.Commit();
+
+        var replacement = new Saga { Id = saga.Id, SomeId = saga.SomeId, LastUpdatedBy = "Replacement" };
+        Exception recreationFailure = null;
+        using (var replacementSession = new NonDurableSynchronizedStorageSession(storage, options))
+        {
+            await replacementSession.Open(new ContextBag());
+            await persister.Save(replacement, correlation, replacementSession, new ContextBag());
+            try
+            {
+                await replacementSession.CompleteAsync();
+            }
+            catch (Exception ex)
+            {
+                recreationFailure = ex;
+            }
+        }
+
+        completingSession.Transaction.Rollback();
+        completingSession.Dispose();
+
+        Assert.That(recreationFailure, Is.Not.Null,
+            "a prepared completion must prevent a second lineage from taking the same saga slot");
+
+        using var readSession = new NonDurableSynchronizedStorageSession(storage, options);
+        await readSession.Open(new ContextBag());
+        var afterAbort = await persister.Get<Saga>(saga.Id, readSession, new ContextBag());
+        await readSession.CompleteAsync();
+
+        Assert.That(afterAbort, Is.Not.Null);
+        Assert.That(afterAbort.LastUpdatedBy, Is.EqualTo("Original"),
+            "rollback must restore the original lineage rather than retaining a concurrently recreated saga");
     }
 
     static async Task<Saga> ReadBack(NonDurableSagaPersister persister, Guid id)

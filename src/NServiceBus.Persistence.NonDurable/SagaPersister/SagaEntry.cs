@@ -5,18 +5,54 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int version, JsonSerializerOptions serializerOptions)
+class SagaEntry
 {
-    public CorrelationId CorrelationId { get; } = correlationId;
+    public SagaEntry(
+        IContainSagaData sagaData,
+        CorrelationId correlationId,
+        int version,
+        NonDurableSagaConcurrencyMode concurrencyMode,
+        JsonSerializerOptions serializerOptions)
+        : this(
+            sagaData,
+            correlationId,
+            version,
+            concurrencyMode,
+            concurrencyMode == NonDurableSagaConcurrencyMode.Pessimistic ? new SagaLockState() : null,
+            serializerOptions,
+            isCompletionPending: false)
+    {
+    }
 
-    public int Version { get; } = version;
+    public CorrelationId CorrelationId { get; }
 
-    public Type SagaDataType { get; } = sagaData.GetType();
+    public int Version { get; }
+
+    public Type SagaDataType { get; }
+
+    public NonDurableSagaConcurrencyMode ConcurrencyMode { get; }
+
+    public bool UsesPessimisticConcurrency => lockState is not null;
+
+    public bool IsCompletionPending { get; }
 
     public IContainSagaData GetSagaCopy() => (IContainSagaData)Deserialize(serializedSagaData, SagaDataType, serializerOptions);
 
     public SagaEntry UpdateTo(IContainSagaData newSagaData, JsonSerializerOptions newSerializerOptions)
-        => new(newSagaData, CorrelationId, Version + 1, newSerializerOptions);
+        => new(newSagaData, CorrelationId, Version + 1, ConcurrencyMode, lockState, newSerializerOptions, isCompletionPending: false);
+
+    public SagaEntry MarkCompletionPending() => new(this);
+
+    public bool HasSameLockIdentity(SagaEntry other) =>
+        lockState is not null
+        && other.lockState is not null
+        && lockState.Identity == other.lockState.Identity;
+
+    public bool TryGetLockState([NotNullWhen(true)] out SagaLockState? value)
+    {
+        value = lockState;
+        return value is not null;
+    }
 
     static string Serialize(object value, Type runtimeType, JsonSerializerOptions options)
     {
@@ -61,5 +97,38 @@ class SagaEntry(IContainSagaData sagaData, CorrelationId correlationId, int vers
         Justification = "Only called when System.Text.Json reflection serialization is enabled.")]
     static object DeserializeWithReflection(string json, Type runtimeType, JsonSerializerOptions options) => JsonSerializer.Deserialize(json, runtimeType, options)!;
 
-    readonly string serializedSagaData = Serialize(sagaData, sagaData.GetType(), serializerOptions);
+    SagaEntry(SagaEntry entry)
+    {
+        CorrelationId = entry.CorrelationId;
+        Version = entry.Version;
+        SagaDataType = entry.SagaDataType;
+        ConcurrencyMode = entry.ConcurrencyMode;
+        IsCompletionPending = true;
+        lockState = entry.lockState;
+        serializerOptions = entry.serializerOptions;
+        serializedSagaData = entry.serializedSagaData;
+    }
+
+    SagaEntry(
+        IContainSagaData sagaData,
+        CorrelationId correlationId,
+        int version,
+        NonDurableSagaConcurrencyMode concurrencyMode,
+        SagaLockState? lockState,
+        JsonSerializerOptions serializerOptions,
+        bool isCompletionPending)
+    {
+        CorrelationId = correlationId;
+        Version = version;
+        SagaDataType = sagaData.GetType();
+        ConcurrencyMode = concurrencyMode;
+        IsCompletionPending = isCompletionPending;
+        this.lockState = lockState;
+        this.serializerOptions = serializerOptions;
+        serializedSagaData = Serialize(sagaData, sagaData.GetType(), serializerOptions);
+    }
+
+    readonly SagaLockState? lockState;
+    readonly JsonSerializerOptions serializerOptions;
+    readonly string serializedSagaData;
 }

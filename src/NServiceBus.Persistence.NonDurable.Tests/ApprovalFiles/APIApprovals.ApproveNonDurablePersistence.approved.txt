@@ -1,4 +1,5 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(@"NServiceBus.Persistence.NonDurable.PersistenceTests, PublicKey=00240000048000009400000006020000002400005253413100040000010001007f16e21368ff041183fab592d9e8ed37e7be355e93323147a1d29983d6e591b04282e4da0c9e18bd901e112c0033925eb7d7872c2f1706655891c5c9d57297994f707d16ee9a8f40d978f064ee1ffc73c0db3f4712691b23bf596f75130f4ec978cf78757ec034625a5f27e6bb50c618931ea49f6f628fd74271c32959efb1c5")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(@"NServiceBus.Persistence.NonDurable.PessimisticLock.PersistenceTests, PublicKey=00240000048000009400000006020000002400005253413100040000010001007f16e21368ff041183fab592d9e8ed37e7be355e93323147a1d29983d6e591b04282e4da0c9e18bd901e112c0033925eb7d7872c2f1706655891c5c9d57297994f707d16ee9a8f40d978f064ee1ffc73c0db3f4712691b23bf596f75130f4ec978cf78757ec034625a5f27e6bb50c618931ea49f6f628fd74271c32959efb1c5")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(@"NServiceBus.Persistence.NonDurable.Tests, PublicKey=00240000048000009400000006020000002400005253413100040000010001007f16e21368ff041183fab592d9e8ed37e7be355e93323147a1d29983d6e591b04282e4da0c9e18bd901e112c0033925eb7d7872c2f1706655891c5c9d57297994f707d16ee9a8f40d978f064ee1ffc73c0db3f4712691b23bf596f75130f4ec978cf78757ec034625a5f27e6bb50c618931ea49f6f628fd74271c32959efb1c5")]
 namespace NServiceBus
 {
@@ -15,10 +16,17 @@ namespace NServiceBus
         public NServiceBus.NonDurableStorage? Storage { get; init; }
         public System.TimeProvider TimeProvider { get; init; }
     }
+    public enum NonDurableSagaConcurrencyMode
+    {
+        Optimistic = 0,
+        Pessimistic = 1,
+    }
     public sealed class NonDurableSagaOptions
     {
         public NonDurableSagaOptions() { }
+        public NServiceBus.NonDurableSagaConcurrencyMode ConcurrencyMode { get; init; }
         public System.Text.Json.JsonSerializerOptions JsonSerializerOptions { get; init; }
+        public System.TimeSpan PessimisticLockTimeout { get; init; }
     }
     public class NonDurableStorage
     {
@@ -39,8 +47,18 @@ namespace NServiceBus.Persistence.NonDurable
 {
     public interface INonDurableStorageSession
     {
+        System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+        System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData;
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData;
     }
@@ -52,15 +70,27 @@ namespace NServiceBus.Persistence.NonDurable
 }
 namespace NServiceBus.Testing
 {
-    public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession
+    public class TestableNonDurableSynchronizedStorageSession : NServiceBus.Persistence.ISynchronizedStorageSession, NServiceBus.Persistence.NonDurable.INonDurableStorageSession, System.IAsyncDisposable, System.IDisposable
     {
         public TestableNonDurableSynchronizedStorageSession() { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableSagaOptions sagaOptions) { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage) { }
         public TestableNonDurableSynchronizedStorageSession(NServiceBus.NonDurableStorage storage, NServiceBus.NonDurableSagaOptions sagaOptions) { }
         public void AddSaga(NServiceBus.IContainSagaData sagaData) { }
+        public void Dispose() { }
+        public System.Threading.Tasks.ValueTask DisposeAsync() { }
+        public System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        public System.Threading.Tasks.Task<TSagaData?> FindSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
+            where TSagaData :  class, NServiceBus.IContainSagaData { }
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         public TSagaData? GetSagaData<TSagaData>(NServiceBus.Extensibility.IReadOnlyContextBag context, System.Func<TSagaData, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
+        [System.Obsolete("GetSagaData performs synchronous-over-asynchronous locking. Use \'FindSagaData\' in" +
+            "stead. Will be treated as an error from version 4.0.0. Will be removed in versio" +
+            "n 5.0.0.", false)]
         public TSagaData? GetSagaData<TSagaData, TState>(NServiceBus.Extensibility.IReadOnlyContextBag context, TState state, System.Func<TSagaData, TState, bool> predicate, System.Threading.CancellationToken cancellationToken = default)
             where TSagaData :  class, NServiceBus.IContainSagaData { }
     }

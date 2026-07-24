@@ -7,6 +7,8 @@
   <Project Path="NServiceBus.Persistence.NonDurable.AcceptanceTests/NServiceBus.Persistence.NonDurable.AcceptanceTests.csproj" />
   <Project Path="NServiceBus.Persistence.NonDurable.NonDurableTransportAcceptanceTests/NServiceBus.Persistence.NonDurable.NonDurableTransportAcceptanceTests.csproj" />
   <Project Path="NServiceBus.Persistence.NonDurable.PersistenceTests/NServiceBus.Persistence.NonDurable.PersistenceTests.csproj" />
+  <Project Path="NServiceBus.Persistence.NonDurable.PessimisticLock.AcceptanceTests/NServiceBus.Persistence.NonDurable.PessimisticLock.AcceptanceTests.csproj" />
+  <Project Path="NServiceBus.Persistence.NonDurable.PessimisticLock.PersistenceTests/NServiceBus.Persistence.NonDurable.PessimisticLock.PersistenceTests.csproj" />
   <Project Path="NServiceBus.Persistence.NonDurable.Tests/NServiceBus.Persistence.NonDurable.Tests.csproj" />
   <Project Path="NServiceBus.Persistence.NonDurable/NServiceBus.Persistence.NonDurable.csproj" />
 </Solution>
