@@ -141,6 +141,41 @@ public class When_ambient_transaction_aborts_after_prepare
     }
 
     [Test]
+    public async Task Should_not_overwrite_a_later_committed_update_when_prepared_update_rolls_back()
+    {
+        var persister = new NonDurableSagaPersister();
+        var saga = new Saga { Id = Guid.NewGuid(), SomeId = "x", LastUpdatedBy = "Original" };
+        var correlation = new SagaCorrelationProperty(nameof(Saga.SomeId), saga.SomeId);
+
+        var saveSession = new NonDurableSynchronizedStorageSession();
+        var saveContext = new ContextBag();
+        await saveSession.Open(saveContext);
+        await persister.Save(saga, correlation, saveSession, saveContext);
+        await saveSession.CompleteAsync();
+
+        var preparedSession = new NonDurableSynchronizedStorageSession();
+        var preparedContext = new ContextBag();
+        await preparedSession.Open(preparedContext);
+        var preparedSaga = await persister.Get<Saga>(saga.Id, preparedSession, preparedContext);
+        preparedSaga.LastUpdatedBy = "Prepared";
+        await persister.Update(preparedSaga, preparedSession, preparedContext);
+        preparedSession.Transaction!.Commit();
+
+        var laterSession = new NonDurableSynchronizedStorageSession();
+        var laterContext = new ContextBag();
+        await laterSession.Open(laterContext);
+        var laterSaga = await persister.Get<Saga>(saga.Id, laterSession, laterContext);
+        laterSaga.LastUpdatedBy = "Later commit";
+        await persister.Update(laterSaga, laterSession, laterContext);
+        await laterSession.CompleteAsync();
+
+        preparedSession.Transaction.Rollback();
+
+        var afterRollback = await ReadBack(persister, saga.Id);
+        Assert.That(afterRollback.LastUpdatedBy, Is.EqualTo("Later commit"));
+    }
+
+    [Test]
     public async Task Should_restore_saga_when_completed_then_transaction_aborted()
     {
         var persister = new NonDurableSagaPersister();
