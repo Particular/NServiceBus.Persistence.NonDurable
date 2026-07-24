@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <!-- Reuse the existing friend assembly identity to test internal persistence components without changing production code. -->
-    <AssemblyName>NServiceBus.Persistence.NonDurable.PersistenceTests</AssemblyName>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\NServiceBusTests.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>

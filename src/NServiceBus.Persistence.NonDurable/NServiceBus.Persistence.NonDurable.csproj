@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NServiceBus.Persistence.NonDurable.PersistenceTests" Key="$(NServiceBusTestsKey)" />
+    <InternalsVisibleTo Include="NServiceBus.Persistence.NonDurable.PessimisticLock.PersistenceTests" Key="$(NServiceBusTestsKey)" />
     <InternalsVisibleTo Include="NServiceBus.Persistence.NonDurable.Tests" Key="$(NServiceBusTestsKey)" />
   </ItemGroup>
 
