@@ -67,7 +67,7 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
             Transaction = nonDurableOutboxTransaction.Transaction;
             ownsTransaction = false;
             waitsForOutboxCompletion = true;
-            nonDurableOutboxTransaction.OnCompleted(CompleteSession);
+            nonDurableOutboxTransaction.OnCompleted(this, static session => session.CompleteSession());
             return new ValueTask<bool>(true);
         }
 
@@ -156,7 +156,7 @@ class NonDurableSynchronizedStorageSession : ICompletableSynchronizedStorageSess
         where TSagaData : class, IContainSagaData =>
         FindSagaData(context, state, predicate, cancellationToken).GetAwaiter().GetResult();
 
-    internal void OnCompleted(Action callback) => completionCallbacks.Add(callback);
+    internal void OnCompleted<TState>(TState state, Action<TState> callback) => completionCallbacks.Add(state, callback);
 
     TimeSpan INonDurableSagaLockingSession.PessimisticLockTimeout => sagaLockingSession.PessimisticLockTimeout;
 

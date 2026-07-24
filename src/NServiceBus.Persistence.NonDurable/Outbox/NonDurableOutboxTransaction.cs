@@ -32,9 +32,9 @@ class NonDurableOutboxTransaction : IOutboxTransaction
         return Task.CompletedTask;
     }
 
-    internal void OnCompleted(Action callback)
+    internal void OnCompleted<TState>(TState state, Action<TState> callback)
     {
-        completionCallbacks.Add(callback);
+        completionCallbacks.Add(state, callback);
     }
 
     public void Dispose()

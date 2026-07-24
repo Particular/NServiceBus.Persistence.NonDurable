@@ -5,17 +5,17 @@ using System.Collections.Generic;
 
 sealed class CompletionCallbacks
 {
-    public void Add(Action callback)
+    public void Add<TState>(TState state, Action<TState> callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
 
         if (callbacksExecuted)
         {
-            callback();
+            callback(state);
             return;
         }
 
-        callbacks.Add(callback);
+        callbacks.Add(new CompletionCallback<TState>(state, callback));
     }
 
     public void Run()
@@ -29,12 +29,22 @@ sealed class CompletionCallbacks
 
         foreach (var callback in callbacks)
         {
-            callback();
+            callback.Invoke();
         }
 
         callbacks.Clear();
     }
 
-    readonly List<Action> callbacks = [];
+    interface ICompletionCallback
+    {
+        void Invoke();
+    }
+
+    sealed class CompletionCallback<TState>(TState state, Action<TState> callback) : ICompletionCallback
+    {
+        public void Invoke() => callback(state);
+    }
+
+    readonly List<ICompletionCallback> callbacks = [];
     bool callbacksExecuted;
 }

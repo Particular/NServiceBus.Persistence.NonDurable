@@ -198,12 +198,12 @@ class NonDurableSagaPersister : ISagaPersister
             // The completion marker keeps the saga ID, correlation ID and lock lineage reserved
             // through ambient prepare. A committed transaction leaves the marker in place for this
             // callback to remove; rollback restores the original entry before this callback runs.
-            synchronizedStorageSession.OnCompleted(() =>
+            synchronizedStorageSession.OnCompleted(operationState, static state =>
             {
-                if (operationState.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(operationState.SagaId, operationState.CompletionPendingEntry))
-                    && !operationState.Entry.CorrelationId.Equals(NoCorrelationId))
+                if (state.Sagas.TryRemove(new KeyValuePair<Guid, SagaEntry>(state.SagaId, state.CompletionPendingEntry))
+                    && !state.Entry.CorrelationId.Equals(NoCorrelationId))
                 {
-                    operationState.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(operationState.Entry.CorrelationId, operationState.SagaId));
+                    state.ByCorrelationId.TryRemove(new KeyValuePair<CorrelationId, Guid>(state.Entry.CorrelationId, state.SagaId));
                 }
             });
             NonDurablePersistenceTracing.AddStagedEvent(activity);
