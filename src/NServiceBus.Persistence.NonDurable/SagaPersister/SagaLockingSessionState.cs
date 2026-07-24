@@ -15,9 +15,15 @@ sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDura
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (!entry.TryGetLockState(out var lockState) || acquiredSagaLocks.ContainsKey(lockState.Identity))
+        SagaLockState? lockState;
+        lock (acquiredSagaLocks)
         {
-            return false;
+            ObjectDisposedException.ThrowIf(sagaLocksReleased, this);
+
+            if (!entry.TryGetLockState(out lockState) || acquiredSagaLocks.ContainsKey(lockState.Identity))
+            {
+                return false;
+            }
         }
 
         if (!await lockState.TryAcquire(timeout, cancellationToken).ConfigureAwait(false))
@@ -25,7 +31,17 @@ sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDura
             throw new NonDurableSagaLockTimeoutException(sagaId, PessimisticLockTimeout);
         }
 
-        acquiredSagaLocks.Add(lockState.Identity, new SagaLockLease(lockState));
+        lock (acquiredSagaLocks)
+        {
+            if (sagaLocksReleased)
+            {
+                lockState.Release();
+                ObjectDisposedException.ThrowIf(true, this);
+            }
+
+            acquiredSagaLocks.Add(lockState.Identity, new SagaLockLease(lockState));
+        }
+
         return true;
     }
 
@@ -33,26 +49,37 @@ sealed class SagaLockingSessionState(TimeSpan pessimisticLockTimeout) : INonDura
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (entry.TryGetLockState(out var lockState) && acquiredSagaLocks.Remove(lockState.Identity, out var lockLease))
+        IDisposable? lockLease = null;
+        lock (acquiredSagaLocks)
         {
-            lockLease.Dispose();
+            if (entry.TryGetLockState(out var lockState))
+            {
+                acquiredSagaLocks.Remove(lockState.Identity, out lockLease);
+            }
         }
+
+        lockLease?.Dispose();
     }
 
     public void ReleaseAllSagaLocks()
     {
-        if (sagaLocksReleased)
+        IDisposable[] lockLeases;
+        lock (acquiredSagaLocks)
         {
-            return;
+            if (sagaLocksReleased)
+            {
+                return;
+            }
+
+            sagaLocksReleased = true;
+            lockLeases = [.. acquiredSagaLocks.Values];
+            acquiredSagaLocks.Clear();
         }
 
-        foreach (var lockLease in acquiredSagaLocks.Values)
+        foreach (var lockLease in lockLeases)
         {
             lockLease.Dispose();
         }
-
-        acquiredSagaLocks.Clear();
-        sagaLocksReleased = true;
     }
 
     bool sagaLocksReleased;

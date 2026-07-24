@@ -248,6 +248,27 @@ class PessimisticSagaLockingTests
         Assert.That(await second.FindSagaData<TestSagaData>(new ContextBag(), static data => data.SomeId == "testable"), Is.Not.Null);
     }
 
+    [Test]
+    public async Task Disposing_testable_session_while_waiting_does_not_leak_acquired_lock()
+    {
+        var (persister, options, storage) = CreatePersister(TimeSpan.FromSeconds(5));
+        var saga = new TestSagaData { Id = Guid.NewGuid(), SomeId = "disposing-waiter" };
+        await SaveSaga(persister, options, storage, saga);
+
+        using var holder = await OpenSession(storage, options);
+        await persister.Get<TestSagaData>(saga.Id, holder, new ContextBag());
+
+        var waiter = new TestableNonDurableSynchronizedStorageSession(storage, options);
+        var waitingRead = waiter.FindSagaData<TestSagaData>(new ContextBag(), static data => data.SomeId == "disposing-waiter");
+        Assert.That(waitingRead.IsCompleted, Is.False);
+
+        waiter.Dispose();
+        holder.Dispose();
+
+        Assert.That(async () => await waitingRead, Throws.InstanceOf<ObjectDisposedException>());
+        await AssertCanRead(persister, storage, options, saga.Id);
+    }
+
     static async Task AssertCanRead(
         NonDurableSagaPersister persister,
         NonDurableStorage storage,

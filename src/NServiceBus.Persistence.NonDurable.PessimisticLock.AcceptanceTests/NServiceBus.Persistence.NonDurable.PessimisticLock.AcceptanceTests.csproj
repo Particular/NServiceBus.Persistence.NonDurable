@@ -20,4 +20,8 @@
     <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="10.2.7" GeneratePathProperty="true" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\NServiceBus.Persistence.NonDurable.AcceptanceTests\When_*.cs" />
+  </ItemGroup>
+
 </Project>
