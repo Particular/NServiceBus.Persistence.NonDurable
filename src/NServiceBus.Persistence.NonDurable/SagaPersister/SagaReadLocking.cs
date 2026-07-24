@@ -1,7 +1,7 @@
 namespace NServiceBus.Persistence.NonDurable.SagaPersister;
 
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 static class SagaReadLocking
 {
     public static ValueTask<TSagaData?> ReadCurrent<TSagaData>(
-        IReadOnlyDictionary<Guid, SagaEntry> sagas,
+        ConcurrentDictionary<Guid, SagaEntry> sagas,
         INonDurableSagaLockingSession lockingSession,
         Func<SagaReadCandidate?> resolveCandidate,
         Func<SagaEntry, TSagaData?> tryRead,
@@ -28,7 +28,7 @@ static class SagaReadLocking
             cancellationToken);
 
     public static async ValueTask<TSagaData?> ReadCurrent<TSagaData, TState>(
-        IReadOnlyDictionary<Guid, SagaEntry> sagas,
+        ConcurrentDictionary<Guid, SagaEntry> sagas,
         INonDurableSagaLockingSession lockingSession,
         TState state,
         Func<TState, SagaReadCandidate?> resolveCandidate,
