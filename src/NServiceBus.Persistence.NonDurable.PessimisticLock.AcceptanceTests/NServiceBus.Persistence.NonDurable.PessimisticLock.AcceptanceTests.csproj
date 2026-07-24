@@ -20,8 +20,19 @@
     <PackageReference Include="NServiceBus.AcceptanceTests.Sources" Version="10.2.7" GeneratePathProperty="true" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(PkgNServiceBus_AcceptanceTests_Sources)' != ''">
+    <Compile Remove="$(PkgNServiceBus_AcceptanceTests_Sources)\**\*.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\EndpointTemplates\*.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\Sagas\*.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\BehaviorBuilderRegistrationExtensions.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\ConfigureEndpointAcceptanceTestingTransport.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\NServiceBusAcceptanceTest.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\RegistrationApproach.cs" />
+    <Compile Include="$(PkgNServiceBus_AcceptanceTests_Sources)\contentFiles\cs\$(TargetFramework)\**\RegistrationExtensions.cs" />
+  </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="..\NServiceBus.Persistence.NonDurable.AcceptanceTests\When_*.cs" />
+    <Compile Include="..\NServiceBus.Persistence.NonDurable.AcceptanceTests\When_*saga*.cs" />
   </ItemGroup>
 
 </Project>
