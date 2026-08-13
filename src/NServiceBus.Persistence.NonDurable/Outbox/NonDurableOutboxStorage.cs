@@ -30,7 +30,12 @@ class NonDurableOutboxStorage(string endpointName, NonDurableStorage storage) : 
 
         NonDurablePersistenceTracing.AddHitEvent(activity);
         NonDurablePersistenceTracing.MarkSuccess(activity);
-        return Task.FromResult(new OutboxMessage(messageId, storedMessage.TransportOperations));
+
+        // Return copies so callers (the dispatch pipeline) own their header dictionaries. The dispatch
+        // pipeline pools and clears outgoing header dictionaries after dispatch, so the outbox must hand
+        // out fresh dictionaries on every Get. Sharing the stored references would let dispatch clear/pool
+        // the stored dictionaries, corrupting storage and leaking aliased dictionaries into the header pool.
+        return Task.FromResult(new OutboxMessage(messageId, storedMessage.TransportOperations.Select(CopyOperation).ToArray()));
     }
 
     public Task<IOutboxTransaction> BeginTransaction(ContextBag context, CancellationToken cancellationToken = default)
