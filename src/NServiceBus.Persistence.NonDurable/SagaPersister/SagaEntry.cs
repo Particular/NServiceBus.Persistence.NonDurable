@@ -66,10 +66,10 @@ class SagaEntry
         return typeInfo is not null ? JsonSerializer.Deserialize(json, typeInfo)! : DeserializeWithReflection(json, runtimeType, options);
     }
 
-    static JsonTypeInfo? ResolveTypeInfo(Type runtimeType, JsonSerializerOptions options)
+    internal static JsonTypeInfo? ResolveTypeInfo(Type runtimeType, JsonSerializerOptions options)
     {
-        var typeInfo = options.TypeInfoResolver?.GetTypeInfo(runtimeType, options);
-        if (typeInfo is not null)
+        // Unlike TypeInfoResolver.GetTypeInfo, this reuses metadata once serialization has made the options read-only
+        if (options.TryGetTypeInfo(runtimeType, out var typeInfo))
         {
             return typeInfo;
         }
